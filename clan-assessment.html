@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | Clan Assessment</title>
+    <script src="js/game.config.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+        .back-link { font-size: 12px; color: #71717a; text-decoration: none; }
+        .page-title { font-size: 15px; font-weight: bold; color: #18181b; }
+        .page-sub { font-size: 11px; color: #71717a; margin-bottom: 4px; }
+
+        .segment { background: #ffffff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e4e4e7; }
+        .progress-track { width: 100%; height: 6px; border-radius: 3px; background: #f4f4f5; overflow: hidden; margin-bottom: 14px; }
+        .progress-fill { height: 100%; background: #7c3aed; border-radius: 3px; transition: width 0.25s; }
+        .q-section-tag { font-size: 9px; font-weight: bold; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .q-count { font-size: 10px; color: #a1a1aa; text-align: right; margin-bottom: 4px; }
+        .q-text { font-size: 14px; font-weight: bold; color: #18181b; margin-bottom: 14px; line-height: 1.4; }
+        .q-option { display: block; width: 100%; text-align: left; padding: 11px 12px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #e4e4e7; background: #fafafa; font-size: 13px; color: #27272a; cursor: pointer; }
+        .q-option:active { background: #eef0fc; border-color: #3f51b5; }
+
+        .result-title { font-size: 20px; font-weight: bold; color: #7c3aed; text-align: center; margin: 8px 0 4px; }
+        .result-desc { font-size: 12px; color: #52525b; text-align: center; margin-bottom: 14px; }
+        .btn { width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        .btn-primary { background: #3f51b5; color: #fff; }
+        .hidden { display: none !important; }
+
+        .stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 6px; }
+        .stat-label { color: #52525b; }
+        .stat-bar-track { flex: 1; height: 6px; background: #f4f4f5; border-radius: 3px; margin: 0 8px; overflow: hidden; }
+        .stat-bar-fill { height: 100%; background: #3f51b5; border-radius: 3px; }
+        .stat-value { font-size: 11px; font-weight: bold; color: #18181b; width: 22px; text-align: right; }
+
+        .trait-chip { display: inline-block; background: #ede9fe; color: #6d28d9; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 12px; margin: 3px 3px 3px 0; }
+        .terrain-box { text-align: center; padding: 10px; background: #f8fafc; border-radius: 8px; margin: 10px 0; }
+        .talent-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #f4f4f5; }
+        .talent-grade { font-weight: bold; color: #3f51b5; }
+        .talent-grade.best { color: #d97706; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a class="back-link" href="settings.html">&larr; Back to Settings</a>
+    <div class="page-title">📋 Clan Assessment</div>
+    <div class="page-sub">
+        50 questions across three parts: your command stats, your best terrain,
+        and your defining traits. Answers are scored, not judged — there's no
+        wrong path.
+    </div>
+
+    <div class="segment" id="quizPanel">
+        <div class="q-section-tag" id="qSection">Part 1 — Command Stats</div>
+        <div class="q-count"><span id="qNum">1</span> / <span id="qTotal">50</span></div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:2%"></div></div>
+        <div class="q-text" id="qText"></div>
+        <div id="qOptions"></div>
+    </div>
+
+    <div class="segment hidden" id="resultPanel">
+        <div style="font-size:12px; color:#71717a; text-align:center;">Your character:</div>
+        <div class="result-title" id="resultTitle"></div>
+        <div class="result-desc" id="resultDesc"></div>
+
+        <div style="margin-top:12px;">
+            <div style="font-size:11px; font-weight:bold; color:#52525b; margin-bottom:8px;">COMMAND STATS (1-20 starter range)</div>
+            <div id="statBlock"></div>
+        </div>
+
+        <div class="terrain-box">
+            <div style="font-size:20px;" id="terrainIcon">🌾</div>
+            <div style="font-size:13px; font-weight:bold; color:#18181b;" id="terrainName">Plains</div>
+            <div style="font-size:11px; color:#71717a;" id="terrainDesc"></div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+            <div style="font-size:11px; font-weight:bold; color:#52525b; margin-bottom:6px;">TRAITS</div>
+            <div id="traitChips"></div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <div style="font-size:11px; font-weight:bold; color:#52525b; margin-bottom:4px;">STARTING TALENT GRADES</div>
+            <div id="talentList"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="window.location.href='settings.html'">DONE</button>
+    </div>
+</div>
+
+<script>
+    const STAT_OPTS = [
+        { t: 'Take charge and rally everyone around a clear plan.',      stat: 'leadership' },
+        { t: 'Push through with pure discipline and grit.',              stat: 'martialDiscipline' },
+        { t: 'Stay composed and wait for the right moment.',             stat: 'calmDiscipline' },
+        { t: 'Read the situation and adapt on the fly.',                 stat: 'battleIntellect' },
+        { t: 'Study it carefully before committing to anything.',        stat: 'intellectual' },
+        { t: 'Talk it through and find common ground first.',            stat: 'political' },
+    ];
+
+    const STAT_PROMPTS = [
+        "The formation is breaking under pressure. What's your first move?",
+        "You're given command of a unit you've never led before.",
+        "An ally makes a costly mistake mid-battle. How do you respond?",
+        "Scouts report conflicting information about enemy numbers.",
+        "You're offered a risky shortcut that could end the fight early.",
+        "A rival commander challenges your battle plan in front of others.",
+        "Supplies are running low before a long march.",
+        "The enemy retreats — do you pursue or hold the line?",
+        "A new recruit asks you how to handle their first real fight.",
+        "Your camp is asked to host a tense negotiation between two clans.",
+        "You spot a weakness in the enemy's formation.",
+        "Morale is dropping after two losses in a row.",
+        "A storm delays your march by a full day.",
+        "You must choose who leads the next skirmish.",
+        "An old rival offers a temporary truce.",
+        "The terrain ahead is unfamiliar to everyone in your unit.",
+        "A subordinate disagrees with your order, loudly.",
+        "You have one chance to gather intel before the battle starts.",
+        "Reinforcements are late and the enemy is already advancing.",
+        "After a hard-won victory, what do you focus on first?",
+    ];
+
+    const TERRAIN_OPTS = [
+        { t: 'Open plains — clear sightlines, room to maneuver.', terrain: 'plains' },
+        { t: 'Dense forest — cover, ambush, low visibility.',     terrain: 'forest' },
+        { t: 'Steep mountains — defensible high ground.',         terrain: 'mountain' },
+        { t: 'Coastal edge — water access, fast logistics.',      terrain: 'coastal' },
+        { t: 'Muddy swamp — treacherous but overlooked.',         terrain: 'swamp' },
+        { t: 'City walls — layered defense, political center.',   terrain: 'urban' },
+    ];
+
+    const TERRAIN_PROMPTS = [
+        "Where would you choose to make your stand?",
+        "You're picking a site to train new recruits.",
+        "Where do you feel most confident leading a charge?",
+        "Your clan needs a new outpost — where do you scout first?",
+        "Which terrain would you use to ambush a larger force?",
+        "Where would you retreat to regroup after a loss?",
+        "You're mapping the safest supply route.",
+        "Which terrain tests your patience the most — in a good way?",
+        "Where would you want your archers positioned?",
+        "If you could only defend one type of ground forever, which?",
+    ];
+
+    const TRAIT_POOL_QUESTIONS = [
+        { q: "What do people notice about you first in a crisis?",
+          options: [
+            { t: 'I take the lead without being asked.', trait: 'Inspiring' },
+            { t: "I don't flinch, no matter what happens.", trait: 'Iron Will' },
+            { t: 'I stay unreadable, calm on the surface.', trait: 'Unshakeable' },
+            { t: 'I already have three plans ready.', trait: 'Strategist' },
+          ]},
+        { q: "How do you handle being outnumbered?",
+          options: [
+            { t: 'I keep pushing anyway.', trait: 'Relentless' },
+            { t: 'I find the angle nobody else sees.', trait: 'Battlefield Genius' },
+            { t: 'I talk my way out first.', trait: 'Silver Tongue' },
+            { t: 'Somehow it always works out for me.', trait: 'Lucky' },
+          ]},
+        { q: "Your commander gives an order you disagree with.",
+          options: [
+            { t: 'I follow it — loyalty comes first.', trait: 'Loyal' },
+            { t: 'I adapt it on the fly to work better.', trait: 'Adaptive' },
+            { t: 'I negotiate a better version first.', trait: 'Diplomat' },
+            { t: 'I ignore it and do what feels right.', trait: 'Reckless' },
+          ]},
+        { q: "What drives you most on the battlefield?",
+          options: [
+            { t: 'Proving I belong at the top.', trait: 'Ambitious' },
+            { t: 'Protecting the people beside me.', trait: 'Loyal' },
+            { t: 'The thrill of a fight nobody thinks I can win.', trait: 'Fearless' },
+            { t: 'Understanding why the enemy fights the way they do.', trait: 'Scholar' },
+          ]},
+        { q: "How do you make a hard decision under time pressure?",
+          options: [
+            { t: 'Trust the plan, commit fully.', trait: 'Commanding Presence' },
+            { t: 'Wait one more second than anyone else is comfortable with.', trait: 'Patient Tactician' },
+            { t: 'Go with gut instinct.', trait: 'Reckless' },
+            { t: 'Run the odds in my head first.', trait: 'Strategist' },
+          ]},
+        { q: "A fellow soldier is panicking mid-battle. You:",
+          options: [
+            { t: 'Give them a clear, steady order.', trait: 'Commanding Presence' },
+            { t: 'Stay calm so they calm down too.', trait: 'Unshakeable' },
+            { t: "Remind them why they're fighting.", trait: 'Inspiring' },
+            { t: 'Just get them out of the immediate danger.', trait: 'Loyal' },
+          ]},
+        { q: "What's your reputation among rivals?",
+          options: [
+            { t: 'They think I want their position.', trait: 'Ambitious' },
+            { t: "They can't read what I'll do next.", trait: 'Adaptive' },
+            { t: 'They respect that I keep my word.', trait: 'Loyal' },
+            { t: "They're wary of how convincing I am.", trait: 'Silver Tongue' },
+          ]},
+        { q: "You've just won against impossible odds. What's your first thought?",
+          options: [
+            { t: "Knew it. I don't lose.", trait: 'Fearless' },
+            { t: 'What did I learn from that?', trait: 'Scholar' },
+            { t: 'That could have gone very differently.', trait: 'Lucky' },
+            { t: 'Who do I need to thank for backing me up?', trait: 'Loyal' },
+          ]},
+        { q: "How do you prepare before a big battle?",
+          options: [
+            { t: 'Study every report I can find.', trait: 'Scholar' },
+            { t: 'Rally the troops with a speech.', trait: 'Inspiring' },
+            { t: 'Sit quietly and steady my mind.', trait: 'Stoic' },
+            { t: 'Map out every possible outcome.', trait: 'Strategist' },
+          ]},
+        { q: "Someone challenges your authority in front of others.",
+          options: [
+            { t: 'I stand my ground, calmly.', trait: 'Unshakeable' },
+            { t: "I remind them exactly who they're talking to.", trait: 'Commanding Presence' },
+            { t: 'I let my track record speak for itself.', trait: 'Stoic' },
+            { t: 'I turn it into a negotiation, not a fight.', trait: 'Diplomat' },
+          ]},
+        { q: "What's your biggest weakness, honestly?",
+          options: [
+            { t: 'I take on too much myself.', trait: 'Ambitious' },
+            { t: 'I act before thinking it through.', trait: 'Reckless' },
+            { t: 'I trust luck more than I should.', trait: 'Lucky' },
+            { t: "I overthink things that don't need it.", trait: 'Scholar' },
+          ]},
+        { q: "How do others describe following your lead?",
+          options: [
+            { t: '"You feel safe, even in chaos."', trait: 'Unshakeable' },
+            { t: '"You make people want to fight harder."', trait: 'Inspiring' },
+            { t: '"You always have a plan B, C, and D."', trait: 'Strategist' },
+            { t: '"You never ask for more than you would give."', trait: 'Loyal' },
+          ]},
+        { q: "A negotiation between two angry clans needs a mediator. You:",
+          options: [
+            { t: 'Volunteer immediately.', trait: 'Diplomat' },
+            { t: 'Find the words that calm both sides.', trait: 'Silver Tongue' },
+            { t: 'Stay neutral and just listen first.', trait: 'Stoic' },
+            { t: 'Push for the outcome I know is right.', trait: 'Commanding Presence' },
+          ]},
+        { q: "What pushes you to keep fighting when it looks hopeless?",
+          options: [
+            { t: 'Sheer refusal to lose.', trait: 'Iron Will' },
+            { t: 'The people counting on me.', trait: 'Loyal' },
+            { t: 'The chance to prove everyone wrong.', trait: 'Fearless' },
+            { t: "A hunch that it's about to turn around.", trait: 'Lucky' },
+          ]},
+        { q: "How do you handle a plan falling apart mid-execution?",
+          options: [
+            { t: 'I improvise a new plan on the spot.', trait: 'Adaptive' },
+            { t: "I keep everyone's focus on me, not the chaos.", trait: 'Commanding Presence' },
+            { t: 'I stay quiet and think it through fast.', trait: 'Patient Tactician' },
+            { t: "I push forward anyway — retreat isn't the plan.", trait: 'Relentless' },
+          ]},
+        { q: "What do you want to be known for, years from now?",
+          options: [
+            { t: 'Never once backing down.', trait: 'Fearless' },
+            { t: 'Always finding the smartest way through.', trait: 'Battlefield Genius' },
+            { t: 'Being someone people could always trust.', trait: 'Loyal' },
+            { t: 'Rising higher than anyone expected.', trait: 'Ambitious' },
+          ]},
+        { q: "You're offered a much bigger role, but it's risky.",
+          options: [
+            { t: 'I take it without hesitation.', trait: 'Ambitious' },
+            { t: 'I take it, no fear either way.', trait: 'Fearless' },
+            { t: 'I weigh it carefully first.', trait: 'Scholar' },
+            { t: 'I ask my closest allies what they think.', trait: 'Diplomat' },
+          ]},
+        { q: "In a losing fight, what's your instinct?",
+          options: [
+            { t: 'Keep swinging until the end.', trait: 'Relentless' },
+            { t: 'Find the one opening left.', trait: 'Battlefield Genius' },
+            { t: 'Stay steady, panic helps no one.', trait: 'Stoic' },
+            { t: "Trust it'll turn — it usually does.", trait: 'Lucky' },
+          ]},
+        { q: "What do you value most in an ally?",
+          options: [
+            { t: 'Someone who never wavers.', trait: 'Iron Will' },
+            { t: 'Someone who can talk us out of trouble.', trait: 'Silver Tongue' },
+            { t: 'Someone who thinks two steps ahead.', trait: 'Strategist' },
+            { t: "Someone who'd never abandon the group.", trait: 'Loyal' },
+          ]},
+        { q: "Last question — how do you want to be remembered?",
+          options: [
+            { t: 'As someone who led from the front.', trait: 'Commanding Presence' },
+            { t: 'As someone who was always one step ahead.', trait: 'Battlefield Genius' },
+            { t: 'As someone who was fair, above all.', trait: 'Diplomat' },
+            { t: 'As someone who simply never gave up.', trait: 'Iron Will' },
+          ]},
+    ];
+
+    const QUESTIONS = [];
+    STAT_PROMPTS.forEach((prompt) => {
+        QUESTIONS.push({ section: 'Part 1 — Command Stats', q: prompt, kind: 'stat', options: STAT_OPTS });
+    });
+    TERRAIN_PROMPTS.forEach((prompt) => {
+        QUESTIONS.push({ section: 'Part 2 — Best Terrain', q: prompt, kind: 'terrain', options: TERRAIN_OPTS });
+    });
+    TRAIT_POOL_QUESTIONS.forEach((item) => {
+        QUESTIONS.push({ section: 'Part 3 — Traits', q: item.q, kind: 'trait', options: item.options });
+    });
+
+    let current = 0;
+    const statTally = { leadership: 0, martialDiscipline: 0, calmDiscipline: 0, battleIntellect: 0, intellectual: 0, political: 0 };
+    const terrainTally = { plains: 0, forest: 0, mountain: 0, coastal: 0, swamp: 0, urban: 0 };
+    const traitTally = {};
+
+    function renderQuestion() {
+        const item = QUESTIONS[current];
+        document.getElementById('qSection').textContent = item.section;
+        document.getElementById('qNum').textContent = current + 1;
+        document.getElementById('qTotal').textContent = QUESTIONS.length;
+        document.getElementById('progressFill').style.width = Math.round((current / QUESTIONS.length) * 100) + '%';
+        document.getElementById('qText').textContent = item.q;
+        const optsEl = document.getElementById('qOptions');
+        optsEl.innerHTML = '';
+        item.options.forEach((opt) => {
+            const btn = document.createElement('button');
+            btn.className = 'q-option';
+            btn.textContent = opt.t;
+            btn.onclick = () => {
+                if (item.kind === 'stat') statTally[opt.stat] += 1;
+                else if (item.kind === 'terrain') terrainTally[opt.terrain] += 1;
+                else if (item.kind === 'trait') traitTally[opt.trait] = (traitTally[opt.trait] || 0) + 1;
+                current++;
+                if (current >= QUESTIONS.length) { showResult(); } else { renderQuestion(); }
+            };
+            optsEl.appendChild(btn);
+        });
+    }
+
+    function topTerrain() {
+        let best = 'plains', bestScore = -1;
+        for (const t in terrainTally) { if (terrainTally[t] > bestScore) { best = t; bestScore = terrainTally[t]; } }
+        return best;
+    }
+
+    function topTraits(n) {
+        return Object.keys(traitTally)
+            .sort((a, b) => traitTally[b] - traitTally[a])
+            .slice(0, n);
+    }
+
+    function showResult() {
+        document.getElementById('progressFill').style.width = '100%';
+
+        const title = getCombatTitle(
+            statTally.martialDiscipline, statTally.battleIntellect,
+            statTally.leadership, statTally.calmDiscipline
+        );
+        const desc = getTitleDesc(title);
+
+        const terrain = topTerrain();
+        const traits = topTraits(4);
+        const talents = getAllStartingTalents(statTally);
+
+        document.getElementById('quizPanel').classList.add('hidden');
+        document.getElementById('resultPanel').classList.remove('hidden');
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultDesc').textContent = desc;
+
+        const statBlock = document.getElementById('statBlock');
+        statBlock.innerHTML = '';
+        GLITZ_CONFIG.clanStats.forEach((key) => {
+            const val = statTally[key];
+            const pct = Math.round((val / 20) * 100);
+            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+            statBlock.innerHTML += '<div class="stat-row">' +
+                '<div class="stat-label" style="width:110px;">' + label + '</div>' +
+                '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%;"></div></div>' +
+                '<div class="stat-value">' + val + '</div>' +
+                '</div>';
+        });
+
+        const terrainInfo = GLITZ_CONFIG.terrains[terrain];
+        document.getElementById('terrainIcon').textContent = terrainInfo.icon;
+        document.getElementById('terrainName').textContent = terrain.charAt(0).toUpperCase() + terrain.slice(1);
+        document.getElementById('terrainDesc').textContent = terrainInfo.desc;
+
+        const chipsEl = document.getElementById('traitChips');
+        chipsEl.innerHTML = traits.map(t => '<span class="trait-chip">' + t + '</span>').join('');
+
+        const talentEl = document.getElementById('talentList');
+        const typeNames = { sword: 'Swordsman', archer: 'Archer', horse: 'Horseman', spear: 'Spearman' };
+        talentEl.innerHTML = '';
+        let bestTier = -1;
+        for (const k in talents) if (talents[k].tierIndex > bestTier) bestTier = talents[k].tierIndex;
+        Object.keys(talents).forEach((type) => {
+            const isBest = talents[type].tierIndex === bestTier;
+            talentEl.innerHTML += '<div class="talent-row">' +
+                '<span>' + typeNames[type] + '</span>' +
+                '<span class="talent-grade ' + (isBest ? 'best' : '') + '">' + talents[type].grade + (isBest ? ' \u2605' : '') + '</span>' +
+                '</div>';
+        });
+
+        window._clanAssessmentResult = { title, statTally, terrain, traits, talents };
+        if (window.saveClanAssessment) window.saveClanAssessment(title, statTally, terrain, traits, talents);
+    }
+
+    renderQuestion();
+</script>
+
+<script type="module">
+    import { auth, db, onAuthStateChanged, doc, updateDoc } from "./js/firebase.config.js";
+    let currentUser = null;
+    onAuthStateChanged(auth, (user) => {
+        if (!user) { window.location.href = "login-signup.html"; return; }
+        currentUser = user;
+    });
+    window.saveClanAssessment = async function(title, statTally, terrain, traits, talents) {
+        if (!currentUser) return;
+        await updateDoc(doc(db, "users", currentUser.uid), {
+            clanAssessmentDone: true,
+            clanUnitType: title,
+            clanStats: statTally,
+            clanTerrain: terrain,
+            clanTraits: traits,
+            clanTalents: talents,
+        });
+    };
+</script>
+
+</body>
+</html>

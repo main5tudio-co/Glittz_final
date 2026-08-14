@@ -1,0 +1,8 @@
+{
+  "appId": "dev.main5tudio.glittzofhorizon",
+  "appName": "Glittz of Horizon",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  }
+}

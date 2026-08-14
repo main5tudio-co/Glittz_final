@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle System Login</title>
+<link rel="manifest" href="manifest.json">
+<style>
+* { box-sizing: border-box; } /* Ensures padding doesn't push inputs wider than 100% */
+body { margin: 0; font-family: Arial, sans-serif; background: #ffffff; color: #3d1717; display: flex; flex-direction: column; min-height: 100vh; }
+.header { text-align: center; padding: 20px; }
+.header h1 { margin: 0; font-size: 24px; }
+.header p { opacity: 0.8; font-size: 7px; font-weight: bold; font-style: italic; }
+.container { flex: 1; display: flex; justify-content: center; align-items: center; }
+.card { background: #ffffff; padding: 20px; border-radius: 12px; color: gray; width: 90%; max-width: 400px; }
+input { width: 100%; padding: 10px; margin: 6px 0; border-radius: 6px; color: #333; border: 1px solid #ccc; font-family: inherit; }
+button { width: 100%; padding: 10px; margin-top: 10px; border: none; border-radius: 6px; background: #38bdf8; color: black; font-weight: bold; cursor: pointer; transition: 0.2s; }
+button:active { opacity: 0.8; }
+.social button { background: #334155; color: white; margin-top: 8px; }
+.social button#googleBtn { background: #db4437; } /* Added Google Red */
+.social button#fbBtn { background: #4267B2; } /* Added FB Blue */
+.switch { text-align: center; margin-top: 15px; cursor: pointer; color: #38bdf8; font-size: 13px; font-weight: bold;}
+.footer { text-align: center; padding: 10px; font-size: 12px; opacity: 0.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>GLITTZ OF HORIZON</h1>
+    <p>Pilih Unitmu. Hamparan Area. Strategize. Alur Unitmu. Track Recordmu.</p>
+</div>
+
+<div class="container">
+    <div class="card">
+        <div id="loginBox">
+            <h3 style="margin-top: 0;">Login</h3>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button id="loginBtn">Login</button>
+            
+            <div style="text-align: center; margin: 15px 0; font-size: 12px; color: #999;">OR</div>
+            
+            <div class="social">
+                <button id="googleBtn">Continue with Google</button>
+                <button id="fbBtn">Continue with Facebook</button>
+            </div>
+            <div class="switch" id="showRegisterBtn">No account? Register</div>
+        </div>
+
+        <div id="registerBox" style="display:none;">
+            <h3 style="margin-top: 0;">Register</h3>
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="password" id="regPassword" placeholder="Password">
+            <button id="registerBtn">Create Account</button>
+            <div class="switch" id="showLoginBtn">Already have account? Login</div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    <p>Dev: main5tudio.dev | About | Privacy</p>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAp9xtIX74D6Heihn6O-7muB0a6mbQno7Y",
+      authDomain: "glittz-of-horizon.firebaseapp.com",
+      projectId: "glittz-of-horizon",
+      storageBucket: "glittz-of-horizon.firebasestorage.app",
+      messagingSenderId: "862322605914",
+      appId: "1:862322605914:web:6f2c26e083dee7857d3d63",
+      measurementId: "G-T61YZTLT53"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // AUTO LOGIN CHECK: If user is already logged in, skip this page
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            window.location.href = "profile.html";
+        }
+    });
+
+    // Setup Social Providers
+    const googleProvider = new GoogleAuthProvider();
+    const facebookProvider = new FacebookAuthProvider();
+
+    // UI Toggles
+    const loginBox = document.getElementById("loginBox");
+    const registerBox = document.getElementById("registerBox");
+
+    document.getElementById("showRegisterBtn").addEventListener("click", () => {
+        loginBox.style.display = "none";
+        registerBox.style.display = "block";
+    });
+
+    document.getElementById("showLoginBtn").addEventListener("click", () => {
+        loginBox.style.display = "block";
+        registerBox.style.display = "none";
+    });
+
+    // Standard Email Login
+    document.getElementById("loginBtn").addEventListener("click", () => {
+        const email = document.getElementById("loginEmail").value;
+        const password = document.getElementById("loginPassword").value;
+        if(!email || !password) return alert("Please enter email and password.");
+        
+        signInWithEmailAndPassword(auth, email, password)
+            .catch((error) => { alert("Login failed: " + error.message); });
+            // Note: onAuthStateChanged handles the redirect automatically!
+    });
+
+    // Standard Email Registration
+    document.getElementById("registerBtn").addEventListener("click", async () => {
+        const username = document.getElementById("regUsername").value;
+        const email = document.getElementById("regEmail").value;
+        const password = document.getElementById("regPassword").value;
+        if(!username || !email || !password) return alert("Please fill all fields.");
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            await updateProfile(user, { displayName: username });
+            
+            // Create user database entry
+            await setDoc(doc(db, "users", user.uid), {
+                username: username,
+                wins: 0, losses: 0, attacks: 0, defenses: 0,
+                favoriteUnit: "None", favoriteUnitRank: "Rookie",
+                battlesPlayedToday: 0,
+                lastBattleDate: new Date().toISOString().split('T')[0],
+                isSpecialUser: false,
+                infantryUsage: 0, archerUsage: 0, horsemanUsage: 0,
+                totalDamageDealt: 0, totalTurnsTaken: 0
+            });
+            // onAuthStateChanged handles the redirect automatically!
+        } catch (error) { alert("Registration Error: " + error.message); }
+    });
+
+    // Shared function for Social Login (Google & FB)
+    async function handleSocialLogin(provider) {
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            
+            // Check if this is their first time logging in by checking Firestore
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (!userDoc.exists()) {
+                // First time user! Build their profile doc.
+                await setDoc(doc(db, "users", user.uid), {
+                    username: user.displayName || "Commander",
+                    wins: 0, losses: 0, attacks: 0, defenses: 0,
+                    favoriteUnit: "None", favoriteUnitRank: "Rookie",
+                    battlesPlayedToday: 0,
+                    lastBattleDate: new Date().toISOString().split('T')[0],
+                    isSpecialUser: false,
+                    infantryUsage: 0, archerUsage: 0, horsemanUsage: 0,
+                    totalDamageDealt: 0, totalTurnsTaken: 0
+                });
+            }
+            // onAuthStateChanged handles the redirect automatically!
+        } catch (error) {
+            if (error.code === 'auth/popup-closed-by-user') return; // Ignore if user just closed the popup
+            alert("Social Login Error: " + error.message + "\n\nMake sure you enabled this provider in your Firebase Console!");
+        }
+    }
+
+    // Attach Social Buttons
+    document.getElementById("googleBtn").addEventListener("click", () => handleSocialLogin(googleProvider));
+    document.getElementById("fbBtn").addEventListener("click", () => handleSocialLogin(facebookProvider));
+
+</script>
+</body>
+</html>

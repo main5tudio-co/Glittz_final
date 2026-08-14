@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | World</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+
+        .segment { background: #ffffff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e4e4e7; }
+        .segment-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #18181b; }
+
+        /* Tab Nav — kept identical to profile.html */
+        .tab-nav { display: flex; background: #ffffff; border-radius: 12px; border: 1px solid #e4e4e7; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .tab-item { flex: 1; text-align: center; padding: 10px 4px; font-size: 12px; font-weight: bold; color: #71717a; text-decoration: none; border-right: 1px solid #e4e4e7; transition: 0.15s; }
+        .tab-item:last-child { border-right: none; }
+        .tab-item:active { background: #f4f4f5; }
+        .tab-active { color: #3f51b5; background: #eef0fc; }
+        .tab-disabled { color: #d4d4d8; cursor: not-allowed; }
+        .hidden { display: none !important; }
+
+        /* Feed */
+        .feed-item { display: flex; gap: 8px; padding: 10px 0; border-bottom: 1px solid #f4f4f5; }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: #e4e4e7; }
+        .feed-body { display: flex; flex-direction: column; gap: 2px; }
+        .feed-author { font-size: 12px; font-weight: bold; color: #18181b; }
+        .feed-text { font-size: 12px; color: #52525b; line-height: 1.4; }
+        .feed-time { font-size: 10px; color: #a1a1aa; }
+        .feed-tag { display: inline-block; font-size: 9px; font-weight: bold; padding: 1px 6px; border-radius: 10px; margin-bottom: 3px; width: fit-content; }
+        .feed-tag.admin { background: #fde68a; color: #92400e; }
+        .feed-tag.player { background: #e0e7ff; color: #3730a3; }
+        .feed-tag.system { background: #dbeafe; color: #1e40af; }
+        .empty-state { text-align: center; padding: 30px 10px; color: #a1a1aa; font-size: 12px; }
+
+        /* Admin composer */
+        .composer textarea { width: 100%; font-size: 13px; padding: 8px 10px; border: 1px solid #d4d4d8; border-radius: 8px; background: #fafafa; resize: vertical; min-height: 50px; font-family: inherit; }
+        .composer button { margin-top: 6px; padding: 8px 14px; background: #3f51b5; color: #fff; border: none; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; }
+
+        /* Battle report card */
+        .battle-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; }
+        .battle-vs-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+        .battle-winner { color: #166534; }
+        .battle-loser { color: #71717a; }
+        .battle-stats { font-size: 10px; color: #a1a1aa; }
+
+        /* Comments */
+        .comment-toggle { font-size: 10px; color: #3f51b5; font-weight: bold; cursor: pointer; margin-top: 6px; }
+        .comment-thread { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e4e4e7; display: none; }
+        .comment-thread.open { display: block; }
+        .comment-row { font-size: 11px; margin-bottom: 4px; }
+        .comment-author { font-weight: bold; color: #18181b; }
+        .comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
+        .comment-input-row input { flex: 1; font-size: 11px; padding: 6px 8px; border: 1px solid #d4d4d8; border-radius: 6px; }
+        .comment-input-row button { font-size: 11px; padding: 6px 10px; background: #3f51b5; color: #fff; border: none; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="tab-nav" id="mainTabNav">
+        <a href="world.html" class="tab-item tab-active">World</a>
+        <a href="profile.html" class="tab-item">Profile</a>
+        <a href="friends.html" class="tab-item">Friendly</a>
+        <a href="settings.html" class="tab-item">Setting</a>
+    </div>
+
+    <div class="segment hidden" id="composerSegment">
+        <div class="segment-title">📝 Post to World Feed (Admin)</div>
+        <div class="composer">
+            <textarea id="composerText" placeholder="Announce something to everyone..."></textarea>
+            <button id="composerPostBtn">Post</button>
+        </div>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">📰 World Feed</div>
+        <div id="feedContainer">
+            <div class="empty-state">Loading feed…</div>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+    import {
+        auth, db, onAuthStateChanged, ensureUserDoc,
+        collection, query, orderBy, limit, onSnapshot, getDocs,
+        postAdminMessage, addFeedComment,
+    } from "./js/firebase.config.js";
+
+    let currentUser = null;
+    let userData = null;
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.href = "login-signup.html"; return; }
+        currentUser = user;
+        userData = await ensureUserDoc(user);
+        if (userData.isAdmin) document.getElementById('composerSegment').classList.remove('hidden');
+        listenFeed();
+    });
+
+    document.getElementById('composerPostBtn').onclick = async () => {
+        const textEl = document.getElementById('composerText');
+        const text = textEl.value.trim();
+        if (!text) return;
+        const btn = document.getElementById('composerPostBtn');
+        btn.disabled = true;
+        try {
+            await postAdminMessage(currentUser, userData, text);
+            textEl.value = '';
+        } catch (e) {
+            alert(e.message || 'Could not post.');
+        }
+        btn.disabled = false;
+    };
+
+    function timeAgo(ts) {
+        if (!ts || !ts.toDate) return 'just now';
+        const diffMin = Math.floor((Date.now() - ts.toDate().getTime()) / 60000);
+        if (diffMin < 1) return 'just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return `${diffHr}h ago`;
+        return `${Math.floor(diffHr / 24)}d ago`;
+    }
+
+    function renderBattleCard(item) {
+        const b = item.battleData;
+        if (!b) return '';
+        const winnerIsP1 = b.winnerName === b.p1Name;
+        return `
+            <div class="battle-card">
+                <div class="battle-vs-row">
+                    <span class="${winnerIsP1 ? 'battle-winner' : 'battle-loser'}">${b.p1Name}${winnerIsP1 ? ' 🏆' : ''}</span>
+                    <span style="color:#a1a1aa;">vs</span>
+                    <span class="${!winnerIsP1 ? 'battle-winner' : 'battle-loser'}">${b.p2Name}${!winnerIsP1 ? ' 🏆' : ''}</span>
+                </div>
+                <div class="battle-stats">Turns: ${b.turns} · ${b.p1Name} Dmg: ${b.p1Dmg} · ${b.p2Name} Dmg: ${b.p2Dmg}</div>
+            </div>`;
+    }
+
+    function renderFeed(items) {
+        const container = document.getElementById('feedContainer');
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div class="empty-state">No activity yet. Be the first!</div>';
+            return;
+        }
+        container.innerHTML = items.map(item => `
+            <div class="feed-item" style="flex-direction:column;" data-post-id="${item.id}">
+                <div style="display:flex; gap:8px;">
+                    <div class="feed-avatar"></div>
+                    <div class="feed-body" style="flex:1;">
+                        <span class="feed-tag ${item.authorType}">${item.authorType === 'admin' ? 'ADMIN' : item.authorType === 'system' ? 'BATTLE' : 'PLAYER'}</span>
+                        ${item.authorName ? `<div class="feed-author">${item.authorName}</div>` : ''}
+                        <div class="feed-text">${item.text}</div>
+                        ${item.type === 'battle_report' ? renderBattleCard(item) : ''}
+                        <div class="feed-time">${timeAgo(item.createdAt)}</div>
+                        <div class="comment-toggle" data-toggle="${item.id}">💬 ${item.commentCount || 0} comment${item.commentCount === 1 ? '' : 's'}</div>
+                        <div class="comment-thread" id="thread-${item.id}">
+                            <div id="comments-${item.id}"></div>
+                            <div class="comment-input-row">
+                                <input type="text" id="commentInput-${item.id}" placeholder="Add a comment...">
+                                <button data-send="${item.id}">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        container.querySelectorAll('.comment-toggle').forEach(el => {
+            el.onclick = () => toggleComments(el.dataset.toggle);
+        });
+        container.querySelectorAll('[data-send]').forEach(el => {
+            el.onclick = () => sendComment(el.dataset.send);
+        });
+    }
+
+    const openThreads = new Set();
+
+    function toggleComments(postId) {
+        const thread = document.getElementById(`thread-${postId}`);
+        const isOpen = thread.classList.toggle('open');
+        if (isOpen) {
+            openThreads.add(postId);
+            loadComments(postId);
+        } else {
+            openThreads.delete(postId);
+        }
+    }
+
+    async function loadComments(postId) {
+        const el = document.getElementById(`comments-${postId}`);
+        el.innerHTML = '<div class="comment-row" style="color:#a1a1aa;">Loading...</div>';
+        const q = query(collection(db, "worldFeed", postId, "comments"), orderBy("createdAt", "asc"), limit(50));
+        const snap = await getDocs(q);
+        if (snap.empty) { el.innerHTML = '<div class="comment-row" style="color:#a1a1aa;">No comments yet.</div>'; return; }
+        el.innerHTML = '';
+        snap.forEach(d => {
+            const c = d.data();
+            el.innerHTML += `<div class="comment-row"><span class="comment-author">${c.authorName}:</span> ${c.text}</div>`;
+        });
+    }
+
+    async function sendComment(postId) {
+        const input = document.getElementById(`commentInput-${postId}`);
+        const text = input.value.trim();
+        if (!text) return;
+        input.disabled = true;
+        try {
+            await addFeedComment(postId, currentUser, userData, text);
+            input.value = '';
+            await loadComments(postId);
+            // reflect the new count in the toggle line without a full feed re-render
+            const toggleEl = document.querySelector(`[data-toggle="${postId}"]`);
+            if (toggleEl) {
+                const n = (parseInt(toggleEl.textContent.match(/\d+/)?.[0] || '0', 10)) + 1;
+                toggleEl.textContent = `💬 ${n} comment${n === 1 ? '' : 's'}`;
+            }
+        } catch (e) {
+            alert(e.message || 'Could not comment.');
+        }
+        input.disabled = false;
+    }
+
+    function listenFeed() {
+        const q = query(collection(db, "worldFeed"), orderBy("createdAt", "desc"), limit(30));
+        onSnapshot(q, (snap) => {
+            const items = [];
+            snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+            renderFeed(items);
+            // Re-open any comment threads that were open before this re-render
+            openThreads.forEach(postId => {
+                const thread = document.getElementById(`thread-${postId}`);
+                if (thread) { thread.classList.add('open'); loadComments(postId); }
+            });
+        });
+    }
+</script>
+
+</body>
+</html>

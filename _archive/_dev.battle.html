@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tactical Grid - Voxel HUD & Battle Report (Flat Grassy Terrain)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(20, 30, 40, 0.95); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        .hidden { display: none !important; }
+        h1 { color: #00ffcc; text-shadow: 2px 2px 0 #000; font-size: 26px; text-transform: uppercase; margin-top:0; text-align: center;} 
+        h2 { border-bottom: 1px solid #777; font-size: 14px; margin-bottom: 10px; padding-bottom: 5px; color:#ddd; text-align: center;}
+        .draft-box { background: rgba(0,0,0,0.5); border: 2px solid #00ffcc; border-radius: 8px; padding: 20px; text-align: center; width: 100%; max-width: 600px; box-shadow: 0 10px 20px rgba(0,0,0,0.5);}
+        .class-btn { background: #222; color: #fff; font-size: 14px; padding: 10px 15px; margin: 4px; border: 2px solid #fff; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #draft-list { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
+        .draft-slot { width: 50px; height: 50px; border: 2px dashed #888; display: flex; align-items: center; justify-content: center; font-size: 24px; border-radius: 8px; background: rgba(255,255,255,0.1);}
+        .btn-start { background: #00ffcc; color: #000; font-size: 18px; font-weight: bold; padding: 12px 35px; border: none; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin-top: 10px;}
+        .btn-start:disabled { background: #555; cursor: not-allowed; } 
+        #ui-layer { position: absolute; top: 10px; left: 10px; font-weight: bold; text-shadow: 1px 1px 2px #fff; z-index: 10; font-size: 15px; color: #000;}
+        .f-ui { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px;}
+        .f-icon { font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 2px; }
+        .bar-container { display: flex; align-items: center; gap: 5px; }
+        .stat-num { font-size: 11px; font-weight: bold; text-shadow: 1px 1px 0 #000; width: 28px; text-align: right; }
+        .bar-bg { width: 35px; height: 5px; background: rgba(0,0,0,0.8); border: 1px solid #fff; border-radius:2px; display:flex;} 
+        .bar-hp { height: 100%; background: #00cc44; width: 100%; transition: width 0.3s;}
+        .bar-st { height: 100%; background: #00aaff; width: 100%; transition: width 0.3s;}
+        .dmg-box { position: absolute; pointer-events: none; z-index: 20; background: #ffe6e6; border: 2px solid #ff4d4d; border-radius: 4px; color: #ff0000; font-weight: bold; font-size: 14px; padding: 2px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); animation: floatUp 1.5s ease-out forwards; white-space: nowrap; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); } 20% { transform: translate(-50%, -100%) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -250%) scale(1); } }
+        .pad { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; gap: 10px; }
+        .abtn { padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer; border: 2px solid #fff; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.4);}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="draft-screen" class="overlay">
+        <h1>Vanguard Assembly</h1>
+        <div class="draft-box">
+            <h2>ENEMY COMPOSITION DETECTED</h2>
+            <div style="color:#ffb3ba; font-weight:bold; margin-bottom: 20px; font-size:22px; letter-spacing:4px;" id="enemy-draft"></div>
+            <h2>DRAFT YOUR 4 SQUADS</h2>
+            <button class="class-btn" style="border-color:#2ea32e" onclick="UI.draftUnit('infantry')">⚔️ Infantry (Mov:3)</button>
+            <button class="class-btn" style="border-color:#d93838" onclick="UI.draftUnit('bowman')">🏹 Bowman (Rng:3)</button>
+            <button class="class-btn" style="border-color:#555555" onclick="UI.draftUnit('horseman')">♞ Horseman (Mov:5)</button>
+            <div id="draft-list">
+                <div class="draft-slot" id="slot-0"></div><div class="draft-slot" id="slot-1"></div>
+                <div class="draft-slot" id="slot-2"></div><div class="draft-slot" id="slot-3"></div>
+            </div>
+            <button id="btn-start" class="btn-start" disabled onclick="ENGINE.startBattle()">ENTER BATTLE</button>
+        </div>
+    </div>
+
+    <div id="ui-layer" class="hidden">Status: <span id="g-stat">IDLE</span></div>
+    <div id="turn-overlay" class="overlay hidden" style="background:rgba(0,0,0,0.8); z-index:100;"><h2>ENEMY IS THINKING...</h2></div>
+    
+    <div id="end-screen" class="overlay hidden" style="z-index:2000;">
+        <h1 id="end-title">BATTLE CONCLUDED</h1>
+        <div class="draft-box">
+            <h2>BATTLE REPORT</h2>
+            <div id="report-content" style="max-height: 300px; overflow-y: auto;"></div>
+        </div>
+    </div>
+    
+    <div id="p-stay" class="pad"><button class="abtn" style="background:#ffcc00; color:#000;" id="b-stay">STAY & FACE</button></div>
+    <div id="p-conf" class="pad"><button class="abtn" style="background:#00cc44; color:#fff;" id="b-ok">OK (MOVE)</button><button class="abtn" style="background:#ff3333; color:#fff;" id="b-can">CANCEL</button></div>
+    <div id="p-act" class="pad"><button class="abtn" style="background:#ff0055; color:#fff;" id="b-atk">ATTACK</button><button class="abtn" style="background:#333; color:#fff;" id="b-wat">WAIT</button></div>
+    <div id="p-sel" class="pad"><button class="abtn" style="background:#ff3333; color:#fff;" id="b-can-sel">CANCEL TARGET</button></div>
+
+<script>
+    const CONFIG = {
+        gridX: 10, gridZ: 16, tileSize: 1.0, tileGap: 0.05, walkSpeed: 4.5,
+        classes: {
+            'infantry': { sign: '⚔️', move: 3, range: 1, hp: 1000, color: 0x2ea32e, shape: 'square' }, 
+            'bowman':   { sign: '🏹', move: 3, range: 3, hp: 800,  color: 0xd93838, shape: 'triangle' },
+            'horseman': { sign: '♞', move: 5, range: 1, hp: 1200, color: 0x333333, shape: 'long_rect' } 
+        }
+    };
+
+    const STATE = {
+        phase: 'START', units: [], mapData: [], activeUnit: null, pendingTile: null, validTargets: [], 
+        hlGroup: new THREE.Group(), faceGroup: new THREE.Group(), tgtGroup: new THREE.Group(), clock: new THREE.Clock()
+    };
+
+    const UI = {
+        playerDraft: [], enemyDraft: [],
+        initDraft: function() {
+            const keys = Object.keys(CONFIG.classes);
+            for(let i=0; i<4; i++) { this.enemyDraft.push(keys[Math.floor(Math.random() * keys.length)]); }
+            document.getElementById('enemy-draft').innerText = this.enemyDraft.map(k => CONFIG.classes[k].sign).join("  ");
+        },
+        draftUnit: function(type) {
+            if(this.playerDraft.length < 4) {
+                const cls = CONFIG.classes[type];
+                let slot = document.getElementById(`slot-${this.playerDraft.length}`);
+                slot.innerText = cls.sign; slot.style.borderColor = '#' + cls.color.toString(16).padStart(6, '0'); slot.style.background = "rgba(255,255,255,0.2)";
+                this.playerDraft.push(type);
+                if(this.playerDraft.length === 4) document.getElementById('btn-start').disabled = false;
+            }
+        },
+        setPad: function(id, isVisible) { document.getElementById(id).style.display = isVisible ? 'flex' : 'none'; },
+        setStatus: function(msg) { document.getElementById('g-stat').innerText = msg; },
+        toScreenPosition: function(vec3) {
+            let v = vec3.clone(); v.project(ENGINE.camera);
+            return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: -(v.y * 0.5 - 0.5) * window.innerHeight };
+        },
+        spawnDamageBox: function(unit, amount, prefix="") {
+            let dt = document.createElement('div'); dt.className = 'dmg-box'; dt.innerText = `${prefix}${amount}`; document.body.appendChild(dt);
+            let pos = this.toScreenPosition(unit.m.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+            dt.style.left = `${pos.x}px`; dt.style.top = `${pos.y}px`;
+            setTimeout(() => { if(dt.parentNode) dt.parentNode.removeChild(dt); }, 1500);
+        }
+    };
+
+    const COMBAT = {
+        getReachable: function(u) { 
+            let maxSteps = Math.min(u.move, Math.floor(u.st / 5)); 
+            let q=[{x:u.x, z:u.z, d:0}], v=Array(CONFIG.gridX).fill(0).map(()=>Array(CONFIG.gridZ).fill(0)), r=[]; v[u.x][u.z]=1;
+            while(q.length) { 
+                let c=q.shift(); r.push(c); 
+                if(c.d < maxSteps) {
+                    [{x:0,z:-1},{x:0,z:1},{x:-1,z:0},{x:1,z:0}].forEach(dir => { 
+                        let nx=c.x+dir.x, nz=c.z+dir.z; 
+                        if(nx>=0 && nx<CONFIG.gridX && nz>=0 && nz<CONFIG.gridZ && !v[nx][nz] && (!STATE.mapData[nx][nz].userData.occ || (nx==u.x && nz==u.z))) { v[nx][nz]=1; q.push({x:nx, z:nz, d:c.d+1}); }
+                    }); 
+                } 
+            } return r; 
+        },
+        getPath: function(sx,sz,ex,ez) { 
+            let o=[{x:sx,z:sz,g:0,f:0,p:null}], c=[];
+            while(o.length) { 
+                o.sort((a,b)=>a.f-b.f); let cur=o.shift(); 
+                if(cur.x==ex && cur.z==ez) { let p=[]; while(cur.p){p.unshift({x:cur.x,z:cur.z}); cur=cur.p;} return p;} 
+                c.push(cur);
+                [{x:0,z:-1},{x:0,z:1},{x:-1,z:0},{x:1,z:0}].forEach(d => { 
+                    let nx=cur.x+d.x, nz=cur.z+d.z; 
+                    if(nx>=0 && nx<CONFIG.gridX && nz>=0 && nz<CONFIG.gridZ && (!STATE.mapData[nx][nz].userData.occ || (nx==ex&&nz==ez)) && !c.find(n=>n.x==nx&&n.z==nz)) { 
+                        let g=cur.g+1, f=g+Math.abs(nx-ex)+Math.abs(nz-ez), nb=o.find(n=>n.x==nx&&n.z==nz); 
+                        if(!nb) o.push({x:nx,z:nz,g,f,p:cur}); else if(g<nb.g){nb.g=g;nb.f=f;nb.p=cur;} 
+                    }
+                }); 
+            } return []; 
+        },
+        getValidTargets: function(u) {
+            let targets = []; let ry = u.m.rotation.y; let dx=0, dz=0; 
+            let pi = Math.PI; let nRy = ry % (2*pi); if (nRy < -0.1) nRy += 2*pi;
+            if (Math.abs(nRy) < 0.1) dz = -1; else if (Math.abs(nRy - pi) < 0.1) dz = 1; else if (Math.abs(nRy - pi/2) < 0.1) dx = -1; else if (Math.abs(nRy - 1.5*pi) < 0.1 || Math.abs(nRy - (-pi/2)) < 0.1) dx = 1;
+
+            if (u.type === 'bowman') {
+                for(let d=1; d<=u.range; d++) {
+                    for(let w = -d+1; w <= d-1; w++) {
+                        let tx = u.x + (dx === 0 ? w : dx*d); let tz = u.z + (dz === 0 ? w : dz*d);
+                        if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ) {
+                            let occ = STATE.mapData[tx][tz].userData.occ; if(occ && occ.tm !== u.tm && occ.hp > 0) targets.push(occ);
+                        }
+                    }
+                }
+            } else {
+                let tx = u.x + dx, tz = u.z + dz;
+                if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ) { let occ = STATE.mapData[tx][tz].userData.occ; if(occ && occ.tm !== u.tm && occ.hp > 0) targets.push(occ); }
+            }
+            return targets;
+        },
+        applyDamage: function(u, amt, prefix="") {
+            u.hp = Math.max(0, u.hp - amt); 
+            document.getElementById(`hp-txt-${u.id}`).innerText = u.hp; document.getElementById(`h-${u.id}`).style.width = `${(u.hp/u.mHp)*100}%`;
+            UI.spawnDamageBox(u, amt, prefix);
+            if(u.hp <= 0) { setTimeout(() => { ENGINE.scene.remove(u.m); STATE.mapData[u.x][u.z].userData.occ = null; u.ui.style.display = 'none'; this.checkBattleEnd(); }, 500); }
+        },
+        applySpecialEffects: function(atk, def, effect) {
+            if (def.hp <= 0) return;
+            if (effect === 'turn') { setTimeout(() => { def.m.lookAt(atk.m.position.x, def.m.position.y, atk.m.position.z); UI.spawnDamageBox(def, "TURNED!", ""); }, 400); } 
+            else if (effect === 'push') {
+                let pdx = Math.sign(def.x - atk.x); let pdz = Math.sign(def.z - atk.z); let tx = def.x + pdx; let tz = def.z + pdz;
+                if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ && !STATE.mapData[tx][tz].userData.occ) {
+                    setTimeout(() => {
+                        STATE.mapData[def.x][def.z].userData.occ = null; def.x = tx; def.z = tz; STATE.mapData[tx][tz].userData.occ = def;
+                        let tgtPos = STATE.mapData[tx][tz].position.clone(); tgtPos.y = def.m.position.y; def.m.position.copy(tgtPos);
+                        STATE.mapData[atk.x][atk.z].userData.occ = null; let ox = def.x - pdx, oz = def.z - pdz; atk.x = ox; atk.z = oz; STATE.mapData[ox][oz].userData.occ = atk;
+                        let aPos = STATE.mapData[ox][oz].position.clone(); aPos.y = atk.m.position.y; atk.m.position.copy(aPos);
+                        UI.spawnDamageBox(def, "SURPRISE!", "");
+                    }, 400);
+                }
+            }
+        },
+        executeAttack: function(atk, def) {
+            let baseDmg = 100 * (0.9 + Math.random() * 0.2); let finalDmg = baseDmg; let prefix = ""; let specialEffect = null;
+            let dist = Math.abs(atk.x - def.x) + Math.abs(atk.z - def.z); let aa = Math.atan2(atk.x - def.x, atk.z - def.z); let da = def.m.rotation.y; 
+            let df = Math.abs(aa - da); while(df > Math.PI) df -= 2*Math.PI; df = Math.abs(df); 
+
+            if (atk.type === 'bowman') { let accuracy = 100 - ((dist - 1) * 15); if (Math.random() * 100 > accuracy) { finalDmg = 0; prefix = "MISS! "; } else { prefix = "HIT! "; } } 
+            else {
+                if (df > 2.356) { finalDmg *= 1.30; prefix = "BACK! "; if (Math.random() < 0.20) specialEffect = 'turn'; } 
+                else if (df > 0.785) { finalDmg *= 1.10; prefix = "SIDE! "; if (Math.random() < 0.30) specialEffect = 'push'; }
+            }
+            if (def.type === 'bowman' && dist === 1) { finalDmg *= 1.15; prefix += "FRAGILE! "; }
+
+            finalDmg = Math.round(finalDmg);
+            if (finalDmg > 0) {
+                atk.dmgDealt += finalDmg; this.applyDamage(def, finalDmg, prefix);
+                if (specialEffect) this.applySpecialEffects(atk, def, specialEffect);
+                setTimeout(() => { if(atk.hp > 0) this.applyDamage(atk, Math.round(finalDmg * (0.07 + Math.random() * 0.08)), "RECOIL "); }, 800);
+            } else { UI.spawnDamageBox(def, "0", prefix); }
+        },
+        checkBattleEnd: function() {
+            let pAlive = STATE.units.filter(u => u.tm === 'player' && u.hp > 0).length;
+            let eAlive = STATE.units.filter(u => u.tm === 'enemy' && u.hp > 0).length;
+            
+            if(pAlive === 0 || eAlive === 0) {
+                STATE.phase = 'END'; document.getElementById('turn-overlay').classList.add('hidden');
+                let html = `<table style="width:100%; text-align:center; font-size:14px; border-collapse:collapse; margin-top:10px;">
+                    <tr style="background:rgba(0,0,0,0.6); color:#00ffcc;"><th style="padding:8px;">Sign</th><th>Team</th><th>HP Left</th><th>Dmg Dealt</th></tr>`;
+                
+                STATE.units.forEach(u => {
+                    let color = u.tm === 'player' ? '#a2e4b8' : '#ffb3ba'; let bg = u.hp > 0 ? 'rgba(255,255,255,0.05)' : 'rgba(255,0,0,0.2)'; 
+                    html += `<tr style="color:${color}; background:${bg}; border-bottom:1px solid #444;">
+                        <td style="padding:8px; font-size:18px;">${CONFIG.classes[u.type].sign}</td><td>${u.tm.toUpperCase()}</td><td>${u.hp} / ${u.mHp}</td><td>${u.dmgDealt}</td></tr>`;
+                });
+                let isWin = pAlive > 0 ? true : false;
+                html += `<tr><button class="btn-start" style="margin-top: 20px;" onclick="window.finishGameAndSave(${isWin})">RETURN TO COMMAND CENTER</button>`;
+                
+                document.getElementById('report-content').innerHTML = html;
+                document.getElementById('end-title').innerText = pAlive > 0 ? "VICTORY ACHIEVED" : "TOTAL DEFEAT";
+                document.getElementById('end-title').style.color = pAlive > 0 ? "#00ff44" : "#ff3333";
+                document.getElementById('end-screen').classList.remove('hidden');
+            }
+        }
+    };
+
+    const ENGINE = {
+        scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000), renderer: new THREE.WebGLRenderer({ antialias: true }),
+        controls: null, raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2(),
+
+        init: function() {
+            this.scene.background = new THREE.Color('#87CEEB'); 
+            this.camera.position.set(12, 18, 12);
+            this.renderer.setSize(window.innerWidth, window.innerHeight); this.renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(this.renderer.domElement);
+
+            this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+            this.controls.enableDamping = true; this.controls.dampingFactor = 0.05; this.controls.enablePan = false; 
+            this.controls.maxPolarAngle = Math.PI / 3; this.controls.minPolarAngle = Math.PI / 3; this.controls.minDistance = 8; this.controls.maxDistance = 30;
+
+            // --- UPGRADED LIGHTING ---
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+            this.scene.add(ambientLight);
+            const sunLight = new THREE.DirectionalLight(0xfff5d1, 1.2);
+            sunLight.position.set(15, 20, 5);
+            sunLight.castShadow = true;
+            sunLight.receiveShadow = false;
+            sunLight.shadow.mapSize.width = 1024;
+            sunLight.shadow.mapSize.height = 1024;
+            this.scene.add(sunLight);
+            const fillLight = new THREE.PointLight(0x88aa66, 0.3);
+            fillLight.position.set(0, -2, 0);
+            this.scene.add(fillLight);
+            this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.008);
+
+            // --- FLAT GRASSY GROUND (no height variations) ---
+            const width = 40;
+            const depth = 40;
+            const segments = 64;  // flat plane, no need high segments
+            const geometry = new THREE.PlaneGeometry(width, depth, segments, segments);
+            geometry.rotateX(-Math.PI / 2);
+            // Keep all Y = 0 (flat)
+            const positions = geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i+1] = 0;
+            }
+            geometry.computeVertexNormals();
+
+            // Create a simple grass texture (seamless, repeatable)
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#6a9e3b';
+            ctx.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 3000; i++) {
+                ctx.fillStyle = `rgba(50, 80, 30, ${Math.random() * 0.5})`;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+            }
+            const grassTexture = new THREE.CanvasTexture(canvas);
+            grassTexture.wrapS = THREE.RepeatWrapping;
+            grassTexture.wrapT = THREE.RepeatWrapping;
+            grassTexture.repeat.set(8, 8);
+
+            const terrainMaterial = new THREE.MeshStandardMaterial({
+                map: grassTexture,
+                roughness: 0.7,
+                metalness: 0.1,
+                color: 0xffffff
+            });
+            const terrainMesh = new THREE.Mesh(geometry, terrainMaterial);
+            terrainMesh.receiveShadow = true;
+            terrainMesh.position.y = -0.1; // slightly below tiles to avoid z-fighting
+            this.scene.add(terrainMesh);
+
+            // --- GRASS INSTANCES (flat ground, Y = 0) ---
+            this.addGrassInstances();
+
+            // --- TILES (solid, opaque) ---
+            const offX = (CONFIG.gridX * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
+            const offZ = (CONFIG.gridZ * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
+            const tGeo = new THREE.BoxGeometry(CONFIG.tileSize - CONFIG.tileGap, 0.1, CONFIG.tileSize - CONFIG.tileGap);
+            // SOLID material (opacity = 1)
+            const tMat = new THREE.MeshStandardMaterial({ color: 0xc2b280, roughness: 0.4, metalness: 0.1 });
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+            const gridGroup = new THREE.Group();
+
+            for(let x=0; x<CONFIG.gridX; x++) { 
+                STATE.mapData[x] = []; 
+                for(let z=0; z<CONFIG.gridZ; z++) {
+                    let tileX = x * CONFIG.tileSize - offX;
+                    let tileZ = z * CONFIG.tileSize - offZ;
+                    let t = new THREE.Mesh(tGeo, tMat);
+                    t.position.set(tileX, 0, tileZ);  // flat ground, Y=0
+                    t.add(new THREE.LineSegments(new THREE.EdgesGeometry(tGeo), edgeMat));
+                    t.userData = { x, z, occ: null };
+                    gridGroup.add(t);
+                    STATE.mapData[x][z] = t;
+                }
+            }
+            this.scene.add(gridGroup);
+            this.scene.add(STATE.hlGroup);
+            this.scene.add(STATE.tgtGroup);
+            this.scene.add(STATE.faceGroup);
+
+            this.setupInteractions(gridGroup);
+            window.addEventListener("resize", () => { this.camera.aspect = window.innerWidth / window.innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(window.innerWidth, window.innerHeight); });
+            this.renderLoop();
+        },
+
+        addGrassInstances: function() {
+            const grassCount = 2500;
+            const bladeGeo = new THREE.PlaneGeometry(0.12, 0.35);
+            const bladeMat = new THREE.MeshStandardMaterial({
+                color: 0x7cb518,
+                side: THREE.DoubleSide,
+                transparent: true,
+                alphaTest: 0.5
+            });
+            const instancedGrass = new THREE.InstancedMesh(bladeGeo, bladeMat, grassCount);
+            let dummy = new THREE.Object3D();
+            let idx = 0;
+            while (idx < grassCount) {
+                const x = (Math.random() - 0.5) * 38;
+                const z = (Math.random() - 0.5) * 38;
+                // place grass exactly on ground (Y=0)
+                dummy.position.set(x, 0.05, z);
+                dummy.rotation.y = Math.random() * Math.PI * 2;
+                dummy.scale.setScalar(0.5 + Math.random() * 0.7);
+                dummy.updateMatrix();
+                instancedGrass.setMatrixAt(idx, dummy.matrix);
+                idx++;
+            }
+            instancedGrass.instanceMatrix.needsUpdate = true;
+            this.scene.add(instancedGrass);
+        },
+
+        startBattle: function() {
+            document.getElementById('draft-screen').classList.add('hidden'); document.getElementById('ui-layer').classList.remove('hidden'); 
+            const pC = [{x:3,z:14}, {x:4,z:14}, {x:5,z:14}, {x:6,z:14}]; const eC = [{x:3,z:1}, {x:4,z:1}, {x:5,z:1}, {x:6,z:1}];
+            UI.playerDraft.forEach((t, i) => this.spawnUnit(t, pC[i].x, pC[i].z, 'player', i));
+            UI.enemyDraft.forEach((t, i) => this.spawnUnit(t, eC[i].x, eC[i].z, 'enemy', i+4));
+            STATE.units.forEach(u => u.ui.classList.remove('hidden')); STATE.phase = 'IDLE';
+        },
+
+        spawnUnit: function(type, x, z, team, id) {
+            const cls = CONFIG.classes[type]; const group = new THREE.Group();
+            let mesh, bGeo; const bMat = new THREE.MeshToonMaterial({ color: cls.color });
+            
+            if (cls.shape === 'square') { bGeo = new THREE.BoxGeometry(0.5, 0.6, 0.5); } 
+            else if (cls.shape === 'triangle') { 
+                const shape = new THREE.Shape(); shape.moveTo(-0.25, -0.25); shape.lineTo(0.25, -0.25); shape.lineTo(0, 0.35); shape.lineTo(-0.25, -0.25);
+                bGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.6, bevelEnabled: false }); bGeo.rotateX(-Math.PI / 2); bGeo.translate(0, -0.3, 0); 
+            } else if (cls.shape === 'long_rect') { bGeo = new THREE.BoxGeometry(0.5, 0.5, 0.9); }
+            mesh = new THREE.Mesh(bGeo, bMat); mesh.position.y = 0.35;
+
+            let faceInd = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({color: 0xffff00}));
+            faceInd.position.set(0, 0, cls.shape==='long_rect'? -0.45 : -0.25); mesh.add(faceInd);
+
+            let eColor = team === 'player' ? 0xffffff : 0x111111;
+            let edges = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), new THREE.LineBasicMaterial({ color: eColor, linewidth: 2 }));
+            mesh.add(edges); group.add(mesh);
+
+            // Position unit on tile (tile at Y=0, unit base at 0.35)
+            let tileObj = STATE.mapData[x][z];
+            group.position.copy(tileObj.position);
+            group.position.y += 0.35;
+            group.rotation.y = team === 'player' ? 0 : Math.PI;
+            this.scene.add(group);
+
+            let ui = document.createElement('div'); ui.className = 'f-ui hidden'; 
+            ui.innerHTML = `<div class="f-icon">${cls.sign}</div><div class="bar-container"><span class="stat-num" style="color:#00ff55;" id="hp-txt-${id}">${cls.hp}</span><div class="bar-bg"><div class="bar-hp" id="h-${id}"></div></div></div><div class="bar-container" style="margin-top:2px;"><span class="stat-num" style="color:#00ccff;" id="st-txt-${id}">100</span><div class="bar-bg" style="height:3px;"><div class="bar-st" id="s-${id}"></div></div></div>`; 
+            document.body.appendChild(ui);
+            
+            let u = {id:id, tm:team, type:type, hp:cls.hp, mHp:cls.hp, move:cls.move, range:cls.range, st:100, dmgDealt:0, x:x, z:z, m:group, ui:ui, act:0, rch:[], path:[]};
+            STATE.mapData[x][z].userData.occ = u; STATE.units.push(u);
+        },
+
+        highlightFacing: function(u) {
+            STATE.faceGroup.clear(); const hMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.5 });
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]]; 
+            dirs.forEach(d => {
+                let tx = u.x + d[0], tz = u.z + d[1];
+                if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ) {
+                    let tile = STATE.mapData[tx][tz];
+                    let hm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.9), hMat); 
+                    hm.position.copy(tile.position); 
+                    hm.userData = { dx: d[0], dz: d[1] }; 
+                    STATE.faceGroup.add(hm);
+                }
+            });
+        },
+
+        setupInteractions: function(gridGroup) {
+            window.addEventListener('pointerdown', (e) => {
+                if(e.target.tagName !== 'CANVAS') return;
+                this.pointer.x = (e.clientX / window.innerWidth) * 2 - 1; this.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                this.raycaster.setFromCamera(this.pointer, this.camera);
+                
+                if(STATE.phase === 'FACE') {
+                    const faceIntersects = this.raycaster.intersectObjects(STATE.faceGroup.children);
+                    if(faceIntersects.length > 0) {
+                        let d = faceIntersects[0].object.userData;
+                        if(d.dz === -1) STATE.activeUnit.m.rotation.y = 0; else if(d.dz === 1) STATE.activeUnit.m.rotation.y = Math.PI; else if(d.dx === -1) STATE.activeUnit.m.rotation.y = Math.PI/2; else if(d.dx === 1) STATE.activeUnit.m.rotation.y = -Math.PI/2;
+                        STATE.faceGroup.clear();
+                        let tgts = COMBAT.getValidTargets(STATE.activeUnit);
+                        if(tgts.length > 0) { STATE.validTargets = tgts; STATE.phase = 'ACT'; UI.setStatus('ATTACK OR WAIT?'); UI.setPad('p-act', true); return; } this.endTurn(); return;
+                    }
+                }
+
+                const intersects = this.raycaster.intersectObjects(gridGroup.children);
+                if(intersects.length > 0) {
+                    let t = intersects[0].object, u = t.userData.occ;
+                    if(STATE.phase === 'IDLE') { 
+                        if(u && u.tm === 'player' && !u.act && u.hp > 0) { STATE.activeUnit = u; STATE.phase = 'SEL_MOVE'; UI.setStatus('SELECT DESTINATION'); this.highlightRange(u); UI.setPad('p-stay', true); } 
+                    }
+                    else if(STATE.phase === 'SEL_MOVE') { 
+                        if(STATE.activeUnit.rch.find(n => n.x === t.userData.x && n.z === t.userData.z) && !u) { STATE.pendingTile = t; STATE.phase = 'CONF'; UI.setStatus('CONFIRM MOVE'); UI.setPad('p-stay', false); UI.setPad('p-conf', true); } 
+                        else if(u === STATE.activeUnit) { document.getElementById('b-stay').click(); } 
+                        else { STATE.phase = 'IDLE'; STATE.activeUnit = null; STATE.hlGroup.clear(); UI.setPad('p-stay', false); UI.setStatus('IDLE'); } 
+                    }
+                    else if(STATE.phase === 'SEL_TARGET') {
+                        if(u && STATE.validTargets.includes(u)) { STATE.tgtGroup.clear(); UI.setPad('p-sel', false); COMBAT.executeAttack(STATE.activeUnit, u); this.endTurn(); }
+                    }
+                }
+            });
+
+            document.getElementById('b-ok').onclick = () => { 
+                UI.setPad('p-conf', false); let p = COMBAT.getPath(STATE.activeUnit.x, STATE.activeUnit.z, STATE.pendingTile.userData.x, STATE.pendingTile.userData.z); 
+                STATE.activeUnit.st -= (p.length * 5); document.getElementById(`st-txt-${STATE.activeUnit.id}`).innerText = STATE.activeUnit.st;
+                STATE.mapData[STATE.activeUnit.x][STATE.activeUnit.z].userData.occ = null; STATE.activeUnit.x = STATE.pendingTile.userData.x; STATE.activeUnit.z = STATE.pendingTile.userData.z; 
+                STATE.pendingTile.userData.occ = STATE.activeUnit; STATE.activeUnit.path = p; STATE.phase = 'MOV'; UI.setStatus('MOVING...'); STATE.hlGroup.clear(); 
+            };
+            document.getElementById('b-can').onclick = () => { STATE.phase = 'IDLE'; STATE.activeUnit = null; STATE.hlGroup.clear(); UI.setPad('p-conf', false); UI.setStatus('IDLE'); };
+            document.getElementById('b-stay').onclick = () => { UI.setPad('p-stay', false); STATE.hlGroup.clear(); STATE.phase = 'FACE'; UI.setStatus('TAP YELLOW TILE TO FACE'); ENGINE.highlightFacing(STATE.activeUnit); };
+            document.getElementById('b-atk').onclick = () => { 
+                UI.setPad('p-act', false); STATE.phase = 'SEL_TARGET'; UI.setStatus('SELECT TARGET IN RADAR'); UI.setPad('p-sel', true); STATE.tgtGroup.clear();
+                STATE.validTargets.forEach(tgt => {
+                    let hm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.9), new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6 }));
+                    hm.position.copy(STATE.mapData[tgt.x][tgt.z].position); STATE.tgtGroup.add(hm); 
+                });
+            };
+            document.getElementById('b-can-sel').onclick = () => { UI.setPad('p-sel', false); STATE.tgtGroup.clear(); STATE.phase = 'ACT'; UI.setStatus('ATTACK OR WAIT?'); UI.setPad('p-act', true); };
+            document.getElementById('b-wat').onclick = () => { UI.setPad('p-act', false); this.endTurn(); };
+        },
+
+        highlightRange: function(u) {
+            STATE.hlGroup.clear(); let rch = COMBAT.getReachable(u); u.rch = rch;
+            const hMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.3 });
+            rch.forEach(n => { 
+                if(n.x === u.x && n.z === u.z) return; 
+                let hm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.9), hMat); hm.position.copy(STATE.mapData[n.x][n.z].position); STATE.hlGroup.add(hm); 
+            }); 
+        },
+
+        endTurn: function() { 
+            STATE.activeUnit.act = 1; STATE.activeUnit.st = Math.min(100, STATE.activeUnit.st + 15); 
+            document.getElementById(`st-txt-${STATE.activeUnit.id}`).innerText = STATE.activeUnit.st; document.getElementById(`s-${STATE.activeUnit.id}`).style.width = `${STATE.activeUnit.st}%`;
+            if(STATE.phase === 'END') return; 
+            if(STATE.units.filter(u => u.tm === 'player' && u.hp > 0).every(u => u.act)) this.startEnemyAI(); else { STATE.phase = 'IDLE'; UI.setStatus('IDLE'); } 
+        },
+
+        startEnemyAI: function() { 
+            if(STATE.phase === 'END') return; 
+            STATE.phase = 'E_TURN'; document.getElementById('turn-overlay').classList.remove('hidden'); 
+            let en = STATE.units.filter(u => u.tm === 'enemy' && u.hp > 0), pl = STATE.units.filter(u => u.tm === 'player' && u.hp > 0), idx = 0;
+            
+            const nextBot = () => { 
+                if(STATE.phase === 'END') return; 
+                if(idx >= en.length || pl.length === 0) { setTimeout(() => { STATE.units.forEach(u => u.act = 0); document.getElementById('turn-overlay').classList.add('hidden'); STATE.phase = 'IDLE'; UI.setStatus('IDLE'); }, 1000); return; }
+                let b = en[idx]; STATE.activeUnit = b; 
+                let cp = pl[0], md = 999; pl.forEach(p => { let d = Math.abs(p.x - b.x) + Math.abs(p.z - b.z); if(d < md) { md = d; cp = p; }}); b.tTgt = cp;
+                
+                b.m.lookAt(cp.m.position.x, b.m.position.y, cp.m.position.z); 
+                let dx = Math.sign(cp.x - b.x), dz = Math.sign(cp.z - b.z);
+                if(dx === 0 || dz === 0 || b.type === 'bowman') { 
+                    if(Math.abs(dx) > Math.abs(dz)) b.m.rotation.y = dx === -1 ? Math.PI/2 : -Math.PI/2; else b.m.rotation.y = dz === -1 ? 0 : Math.PI;
+                    let tgts = COMBAT.getValidTargets(b);
+                    if(tgts.includes(cp)) { 
+                        COMBAT.executeAttack(b,cp); b.st=Math.min(100,b.st+15); document.getElementById(`st-txt-${b.id}`).innerText=b.st; document.getElementById(`s-${b.id}`).style.width=`${b.st}%`; 
+                        idx++; setTimeout(nextBot, 1500); return; 
+                    }
+                }
+
+                let pt = COMBAT.getPath(b.x, b.z, cp.x, cp.z);
+                if(pt.length > 0) { 
+                    pt.pop(); let maxSteps = Math.min(b.move, Math.floor(b.st / 5)); let r = pt.length > maxSteps ? pt.slice(0, maxSteps) : pt; 
+                    if(r.length > 0) { 
+                        let fd = r[r.length-1]; b.st -= (r.length * 5); document.getElementById(`st-txt-${b.id}`).innerText=b.st; document.getElementById(`s-${b.id}`).style.width=`${b.st}%`;
+                        STATE.mapData[b.x][b.z].userData.occ = null; b.x = fd.x; b.z = fd.z; STATE.mapData[fd.x][fd.z].userData.occ = b; b.path = r; STATE.phase = 'MOV_B'; 
+                        b.onF = () => { 
+                            b.m.lookAt(b.tTgt.m.position.x, b.m.position.y, b.tTgt.m.position.z); let ndx = Math.sign(b.tTgt.x - b.x), ndz = Math.sign(b.tTgt.z - b.z);
+                            if(Math.abs(ndx) > Math.abs(ndz)) b.m.rotation.y = ndx === -1 ? Math.PI/2 : -Math.PI/2; else b.m.rotation.y = ndz === -1 ? 0 : Math.PI;
+                            let tgts = COMBAT.getValidTargets(b);
+                            if(tgts.length > 0) { COMBAT.executeAttack(b, tgts[0]); setTimeout(nextBot, 1500); } else { setTimeout(nextBot, 500); } 
+                            b.st=Math.min(100,b.st+15); document.getElementById(`st-txt-${b.id}`).innerText=b.st; document.getElementById(`s-${b.id}`).style.width=`${b.st}%`; idx++;
+                        }; return;
+                    }
+                }
+                b.st=Math.min(100,b.st+15); document.getElementById(`st-txt-${b.id}`).innerText=b.st; document.getElementById(`s-${b.id}`).style.width=`${b.st}%`; idx++; setTimeout(nextBot, 500); 
+            }; setTimeout(nextBot, 1000); 
+        },
+
+        renderLoop: function() {
+            requestAnimationFrame(() => this.renderLoop()); let dt = STATE.clock.getDelta();
+            if((STATE.phase === 'MOV' || STATE.phase === 'MOV_B') && STATE.activeUnit && STATE.activeUnit.path.length > 0) {
+                let n = STATE.activeUnit.path[0], tv = STATE.mapData[n.x][n.z].position.clone(); 
+                let activeM = STATE.activeUnit.m; 
+                activeM.lookAt(tv.x, activeM.position.y, tv.z);
+                let dist = activeM.position.distanceTo(new THREE.Vector3(tv.x, activeM.position.y, tv.z));
+                if(dist <= CONFIG.walkSpeed * dt) { activeM.position.x = tv.x; activeM.position.z = tv.z; STATE.activeUnit.path.shift(); } 
+                else { let dir = new THREE.Vector3(tv.x - activeM.position.x, 0, tv.z - activeM.position.z).normalize(); activeM.position.add(dir.multiplyScalar(CONFIG.walkSpeed * dt)); }
+                if(STATE.activeUnit.path.length === 0) { 
+                    if(STATE.phase === 'MOV') { STATE.phase = 'FACE'; UI.setStatus('TAP YELLOW TILE TO FACE'); ENGINE.highlightFacing(STATE.activeUnit); } else { STATE.phase = 'E_TURN'; STATE.activeUnit.onF(); } 
+                }
+            }
+            STATE.units.forEach(u => { if(u.hp > 0) { let pos = UI.toScreenPosition(u.m.position.clone().add(new THREE.Vector3(0, 1.2, 0))); u.ui.style.left = `${pos.x}px`; u.ui.style.top = `${pos.y}px`; } }); 
+            this.controls.update(); this.renderer.render(this.scene, this.camera);
+        }
+    };
+
+    window.onload = () => { UI.initDraft(); ENGINE.init(); };
+</script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+    import { getFirestore, doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAp9xtIX74D6Heihn6O-7muB0a6mbQno7Y",
+      authDomain: "glittz-of-horizon.firebaseapp.com",
+      projectId: "glittz-of-horizon",
+      storageBucket: "glittz-of-horizon.firebasestorage.app",
+      messagingSenderId: "862322605914",
+      appId: "1:862322605914:web:6f2c26e083dee7857d3d63",
+      measurementId: "G-T61YZTLT53"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUserUid = null;
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) { currentUserUid = user.uid; }
+    });
+
+    window.finishGameAndSave = async function(isVictory) {
+        if (!currentUserUid) { window.location.href = "profile.html"; return; }
+        const userRef = doc(db, "users", currentUserUid);
+        if (isVictory) { await updateDoc(userRef, { wins: increment(1) }); } 
+        else { await updateDoc(userRef, { losses: increment(1) }); }
+        window.location.href = "profile.html";
+    };
+</script>
+</body>
+</html>

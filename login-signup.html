@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle System Login</title>
+<link rel="manifest" href="manifest.json">
+<style>
+* { box-sizing: border-box; } /* Ensures padding doesn't push inputs wider than 100% */
+body { margin: 0; font-family: Arial, sans-serif; background: #ffffff; color: #3d1717; display: flex; flex-direction: column; min-height: 100vh; }
+.header { text-align: center; padding: 20px; }
+.header h1 { margin: 0; font-size: 24px; }
+.header p { opacity: 0.8; font-size: 7px; font-weight: bold; font-style: italic; }
+.container { flex: 1; display: flex; justify-content: center; align-items: center; }
+.card { background: #ffffff; padding: 20px; border-radius: 12px; color: gray; width: 90%; max-width: 400px; }
+input { width: 100%; padding: 10px; margin: 6px 0; border-radius: 6px; color: #333; border: 1px solid #ccc; font-family: inherit; }
+button { width: 100%; padding: 10px; margin-top: 10px; border: none; border-radius: 6px; background: #38bdf8; color: black; font-weight: bold; cursor: pointer; transition: 0.2s; }
+button:active { opacity: 0.8; }
+.social button { background: #334155; color: white; margin-top: 8px; }
+.social button#googleBtn { background: #db4437; } /* Added Google Red */
+.social button#fbBtn { background: #4267B2; } /* Added FB Blue */
+.switch { text-align: center; margin-top: 15px; cursor: pointer; color: #38bdf8; font-size: 13px; font-weight: bold;}
+.footer { text-align: center; padding: 10px; font-size: 12px; opacity: 0.6; }
+
+/*
+  ==========================================================================
+  WHAT: Studio intro splash — plays once on page load, then fades out to
+        reveal the login card underneath. Built with pure CSS keyframes,
+        no video file and no Lottie JSON dependency.
+  WHY CSS instead of an .mp4 or Lottie file:
+        - .mp4 needs a video decoder + file weight (your reference clip is
+          ~350KB for 17s; a CSS version is a few hundred BYTES, since it's
+          just text + timing rules, no pixel data at all).
+        - Lottie needs an exported JSON (from After Effects/LottieFiles) —
+          great for complex motion, but overkill for a simple glow-in title.
+        - CSS keyframes run natively in the browser's rendering engine,
+          so there's zero extra network request and it never "buffers."
+  LEARNING — how @keyframes works:
+        - You define named stages (0%, 50%, 100%...) describing the
+          property values at each point in the animation's timeline.
+        - The browser interpolates (smoothly transitions) between those
+          stages automatically — you don't write every frame by hand,
+          unlike a Lottie/video which stores near-every-frame data.
+        - "animation: nameOfKeyframes duration timing-function fill-mode;"
+          on the element is what actually plays it.
+  ==========================================================================
+*/
+#studio-splash {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #0a0a0f; /* near-black, matches your reference video's dark intro */
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    animation: splashFadeOut 0.6s ease-in 2.6s forwards; /* starts fading at 2.6s, over 0.6s */
+}
+#studio-splash .studio-name {
+    font-family: Arial, sans-serif; font-weight: 900; font-size: 32px;
+    color: #ff9f43; /* orange, matching MAIN5TUDIO wordmark in your video */
+    letter-spacing: 1px;
+    opacity: 0; /* starts invisible; keyframes bring it in */
+    text-shadow: 0 0 12px rgba(255, 159, 67, 0.75); /* the "glow" effect */
+    animation: splashTextIn 1s ease-out 0.2s forwards;
+}
+#studio-splash .studio-tag {
+    font-family: Arial, sans-serif; font-size: 13px; font-weight: bold;
+    color: #1a1a1a; background: #f4f4f4; padding: 2px 10px; border-radius: 6px;
+    margin-top: 6px; opacity: 0;
+    animation: splashTextIn 0.8s ease-out 0.9s forwards;
+}
+/* Stage 1: text rises slightly + fades in + glow intensifies */
+@keyframes splashTextIn {
+    0%   { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+/* Stage 2: whole splash screen fades out, revealing the login card underneath */
+@keyframes splashFadeOut {
+    0%   { opacity: 1; pointer-events: auto; }
+    100% { opacity: 0; pointer-events: none; visibility: hidden; }
+}
+</style>
+</head>
+<body>
+
+<!--
+  WHAT: The splash markup itself — just two text lines, no image/video tag.
+  LEARNING: This whole "intro" is 2 <div>s. The animation timing is fully
+             controlled by the CSS keyframes above (delays: 0.2s, 0.9s,
+             then fade-out starting 2.6s). To change how long it plays,
+             edit the "2.6s" delay in the #studio-splash animation rule —
+             that's the ONLY number you need to touch for total duration.
+  NOTE: This sits ON TOP of the login form (z-index: 9999) and fades out
+         automatically — the user never has to tap anything to dismiss it.
+-->
+<div id="studio-splash">
+    <div class="studio-name">MAIN5TUDIO</div>
+    <div class="studio-tag">.teamdev</div>
+</div>
+
+<div class="header">
+    <h1>GLITTZ OF HORIZON</h1>
+    <p>Pilih Unitmu. Hamparan Area. Strategize. Alur Unitmu. Track Recordmu.</p>
+</div>
+
+<div class="container">
+    <div class="card">
+        <div id="loginBox">
+            <h3 style="margin-top: 0;">Login</h3>
+            <div class="social">
+                <button id="googleBtn">⚡ Continue with Google</button>
+                <button id="fbBtn">Continue with Facebook</button>
+            </div>
+            <div style="text-align: center; font-size: 10px; color: #a1a1aa; margin: 6px 0 14px;">Fastest way in — one tap, still a real account with saved progress.</div>
+
+            <div style="text-align: center; margin-bottom: 15px; font-size: 12px; color: #999;">— or use email —</div>
+
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button id="loginBtn">Login</button>
+
+            <div class="switch" id="showRegisterBtn">No account? Register</div>
+        </div>
+
+        <div id="registerBox" style="display:none;">
+            <h3 style="margin-top: 0;">Register</h3>
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="password" id="regPassword" placeholder="Password">
+            <button id="registerBtn">Create Account</button>
+            <div class="switch" id="showLoginBtn">Already have account? Login</div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    <p>Dev: main5tudio.dev | About | Privacy</p>
+</div>
+
+<script>
+    // WHAT: Removes the splash <div> from the page entirely once its
+    //        fade-out CSS animation finishes playing.
+    // LEARNING: "visibility: hidden" in the CSS keyframes already makes it
+    //            invisible and unclickable, but the element still exists
+    //            in the DOM. Calling .remove() here fully deletes it, which
+    //            is cleaner (no leftover invisible layer sitting in memory)
+    //            and matches good practice for one-time intro animations.
+    //            "animationend" is a native browser event — no library needed.
+    document.getElementById('studio-splash').addEventListener('animationend', function() {
+        this.remove();
+    });
+</script>
+
+<script type="module">
+    import {
+        auth, onAuthStateChanged,
+        registerWithEmail, loginWithEmail,
+        loginWithGoogle, loginWithFacebook, checkRedirectResult,
+    } from "./js/firebase.config.js";
+
+    // AUTO LOGIN CHECK: If user is already logged in, skip this page
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            window.location.href = "profile.html";
+        }
+    });
+
+    // REDIRECT RESULT CHECK: after signInWithRedirect() sends the browser to
+    // Google/Facebook and back, this is what actually finishes the login.
+    // Runs once on every load of this page (harmless if user just landed here
+    // normally — result will simply be null).
+    checkRedirectResult().catch((error) => {
+        const msg = (error && error.message) || '';
+        if (msg.toLowerCase().includes('missing initial state')) {
+            // Known Firebase issue: the redirect round-trip lost its browser
+            // sessionStorage. Common causes: opened via an in-app browser
+            // (WhatsApp/Instagram link), incognito/private mode, or strict
+            // storage-partitioning on some Android browsers. Not a config
+            // problem on our end — the old message wrongly suggested it was.
+            alert(
+                "Login didn't complete (browser lost its session mid-redirect).\n\n" +
+                "If you opened this link from inside WhatsApp or another app, try opening it in Chrome directly instead.\n\n" +
+                "Or just use email + password below — it doesn't have this issue."
+            );
+        } else {
+            alert("Social Login Error: " + msg + "\n\nMake sure you enabled this provider in your Firebase Console!");
+        }
+    });
+
+    // UI Toggles
+    const loginBox = document.getElementById("loginBox");
+    const registerBox = document.getElementById("registerBox");
+
+    document.getElementById("showRegisterBtn").addEventListener("click", () => {
+        loginBox.style.display = "none";
+        registerBox.style.display = "block";
+    });
+
+    document.getElementById("showLoginBtn").addEventListener("click", () => {
+        loginBox.style.display = "block";
+        registerBox.style.display = "none";
+    });
+
+    // SAFETY NET: wraps a promise so it can never hang the UI forever.
+    // If Firebase's internal auth iframe gets blocked (some mobile browsers
+    // restrict third-party cookies), a request can hang with no error and no
+    // success — this makes sure the user sees SOMETHING after 10s instead of
+    // a button that looks "stuck".
+    function withTimeout(promise, ms = 10000) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), ms)
+            )
+        ]);
+    }
+
+    // Standard Email Login
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+        const email = document.getElementById("loginEmail").value;
+        const password = document.getElementById("loginPassword").value;
+        if(!email || !password) return alert("Please enter email and password.");
+
+        const btn = document.getElementById("loginBtn");
+        btn.disabled = true; btn.textContent = "Logging in...";
+        try {
+            await withTimeout(loginWithEmail(email, password));
+            // onAuthStateChanged handles the redirect automatically!
+        } catch (error) {
+            alert("Login failed: " + error.message);
+        } finally {
+            btn.disabled = false; btn.textContent = "Login";
+        }
+    });
+
+    // Standard Email Registration
+    document.getElementById("registerBtn").addEventListener("click", async () => {
+        const username = document.getElementById("regUsername").value;
+        const email = document.getElementById("regEmail").value;
+        const password = document.getElementById("regPassword").value;
+        if(!username || !email || !password) return alert("Please fill all fields.");
+
+        const btn = document.getElementById("registerBtn");
+        btn.disabled = true; btn.textContent = "Creating...";
+        try {
+            await withTimeout(registerWithEmail(username, email, password));
+            // ensureUserDoc() sudah bikin dokumen users/{uid} pakai DEFAULT_USER
+            // onAuthStateChanged handles the redirect automatically!
+        } catch (error) {
+            alert("Registration Error: " + error.message);
+        } finally {
+            btn.disabled = false; btn.textContent = "Create Account";
+        }
+    });
+
+    // Shared function for Social Login (Google & FB)
+    // NOTE: loginFn() now calls signInWithRedirect, which navigates the whole
+    // page away — it does NOT return a signed-in user directly anymore. The
+    // actual result is picked up by checkRedirectResult() when the page
+    // reloads after coming back from Google/Facebook (see above).
+    async function handleSocialLogin(loginFn) {
+        try {
+            await loginFn();
+        } catch (error) {
+            alert("Social Login Error: " + error.message + "\n\nMake sure you enabled this provider in your Firebase Console!");
+        }
+    }
+
+    // Attach Social Buttons
+    document.getElementById("googleBtn").addEventListener("click", () => handleSocialLogin(loginWithGoogle));
+    document.getElementById("fbBtn").addEventListener("click", () => handleSocialLogin(loginWithFacebook));
+
+</script>
+</body>
+</html>

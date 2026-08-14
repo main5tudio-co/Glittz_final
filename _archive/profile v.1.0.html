@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | Advanced Profile</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px; 
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        /* Segment Containers */
+        .segment {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #e4e4e7;
+        }
+        .segment-title {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #18181b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Top Profile Layout */
+        .profile-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+        .profile-info { width: 65%; display: flex; flex-direction: column; gap: 4px; }
+        .profile-pic-wrapper { width: 35%; display: flex; justify-content: flex-end; position: relative; }
+
+        /* Typography & Name Area */
+        .name-row { display: flex; align-items: center; gap: 6px; }
+        .name-text { font-size: 18px; font-weight: bold; color: rgba(0, 0, 0, 0.85); }
+        .edit-btn { background: #f4f4f5; border: 1px solid #d4d4d8; border-radius: 4px; cursor: pointer; font-size: 10px; padding: 2px 6px; color: #52525b; }
+        .rename-limit { font-size: 9px; color: #a1a1aa; background: #f4f4f5; padding: 2px 4px; border-radius: 6px; }
+
+        /* Title & Desc */
+        .title-text { font-size: 13px; font-weight: bold; color: #3f3f46; }
+        .title-desc { font-size: 11px; font-style: italic; color: #71717a; line-height: 1.3; }
+
+        /* Avatar */
+        .avatar-img { width: 65px; height: 65px; border-radius: 10px; object-fit: cover; border: 1px solid #d4d4d8; cursor: pointer; transition: 0.2s; }
+        .avatar-img:hover { opacity: 0.8; border-color: #3b82f6; }
+        .avatar-modal { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e4e4e7; width: 100%; }
+        .avatar-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .avatar-option { width: 100%; aspect-ratio: 1; border-radius: 8px; cursor: pointer; border: 2px solid transparent; background: #f8fafc; }
+        .avatar-option.selected { border-color: #3b82f6; transform: scale(1.05); }
+
+        /* 8-Point Statistical Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 10px; text-align: center; }
+        .stat-item { background: #f8fafc; padding: 8px 2px; border-radius: 6px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; justify-content: center;}
+        .stat-val { font-weight: bold; font-size: 13px; color: #0f172a; margin-bottom: 2px; }
+        .stat-label { color: #52525b; line-height: 1.1; }
+        .stat-highlight { color: #2563eb; font-size: 11px; }
+
+        /* Game Modes */
+        .modes-grid { display: flex; flex-direction: column; gap: 8px; }
+        .btn-mode { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 13px; cursor: pointer; }
+        
+        /* Bandit Active */
+        .btn-bandit { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; box-shadow: 0 2px 4px rgba(55,48,163,0.1); }
+        /* PvP Disabled */
+        .btn-pvp { background: #f4f4f5; color: #a1a1aa; border: 1px dashed #d4d4d8; cursor: not-allowed; }
+        .pvp-info { font-size: 10px; font-weight: normal; color: #71717a; text-align: right; }
+        
+        .energy-note { font-size: 10px; text-align: center; color: #71717a; margin-top: 2px; }
+        
+        /* Top 15 Micro Table */
+        .table-container { max-height: 160px; overflow-y: auto; border: 1px solid #e4e4e7; border-radius: 6px; }
+        .micro-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; background: #fafafa; }
+        .micro-table th { background: #f4f4f5; padding: 6px; position: sticky; top: 0; color: #52525b; font-weight: bold; border-bottom: 1px solid #e4e4e7; z-index: 1;}
+        .micro-table td { padding: 5px 6px; border-bottom: 1px solid #f4f4f5; color: #27272a; }
+        .micro-table tr:last-child td { border-bottom: none; }
+        .score-col { font-weight: bold; color: #047857; text-align: right; }
+        .rank-col { color: #a1a1aa; width: 20px; text-align: center; font-weight: bold;}
+
+        /* Support Block */
+        .btn-trakteer { display: block; width: 100%; background: #be1e2d; color: white; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; text-decoration: none; border: none; }
+        
+        /* Feedback & Messages */
+        .msg-list { max-height: 120px; overflow-y: auto; font-size: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .msg-item { background: #f8fafc; border-radius: 6px; padding: 6px; border: 1px solid #f1f5f9; }
+        .dev-reply { background: #e0e7ff; padding: 4px; border-radius: 4px; margin-top: 4px; color: #3730a3; border-left: 2px solid #3730a3;}
+        .textarea-feedback { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d4d4d8; font-size: 11px; font-family: inherit; resize: none; margin-bottom: 6px; background: #f8fafc; }
+        .btn-send { width: 100%; background: #3b82f6; color: white; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 12px; border: none; cursor: pointer; }
+
+        /* Logout */
+        .btn-logout { width: 100%; background: #e4e4e7; color: #52525b; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; border: none; cursor: pointer; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="segment profile-header">
+        <div class="profile-info">
+            <div class="name-row">
+                <span class="name-text" id="playerName">Loading...</span>
+                <button class="edit-btn" id="editNameBtn">Edit</button>
+                <span class="rename-limit">1/mo</span>
+            </div>
+            <div class="title-text" id="playerTitle">Recruit</div>
+            <div class="title-desc" id="playerDesc">Memulai perjalanan di medan pertempuran.</div>
+        </div>
+        <div class="profile-pic-wrapper">
+            <img src="https://ui-avatars.com/api/?name=...&background=e4e4e7&color=fff&size=128" alt="Profile" class="avatar-img" id="currentAvatar" onclick="toggleAvatarModal()">
+        </div>
+
+        <div class="avatar-modal" id="avatarModal">
+            <div style="font-size: 11px; margin-bottom: 6px; font-weight: bold; color: #52525b;">Select Vanguard Banner:</div>
+            <div class="avatar-grid" id="avatarSelectorContainer"></div>
+        </div>
+    </div>
+
+    <div class="segment">
+        <div class="stats-grid">
+            <div class="stat-item"><div class="stat-val" id="stat-wins">0</div><div class="stat-label">Wins</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-losses">0</div><div class="stat-label">Losses</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-score">0</div><div class="stat-label">Score</div></div>
+            <div class="stat-item"><div class="stat-val stat-highlight" id="stat-rank">Recruit</div><div class="stat-label">Class</div></div>
+            
+            <div class="stat-item"><div class="stat-val" id="stat-avgturn">0</div><div class="stat-label">Avg Turns</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-avgdmg">0</div><div class="stat-label">Avg Dmg</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-maxdmg">0</div><div class="stat-label">Max Dmg</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-avgtime">0s</div><div class="stat-label">Avg Time</div></div>
+        </div>
+    </div>
+
+    <div class="segment modes-grid">
+        <button class="btn-mode btn-bandit" id="banditBtn">
+            <span>🛡️ Bandit Match (vs AI)</span>
+            <span style="font-size:11px; font-weight:normal;">Active Mode</span>
+        </button>
+        
+        <button class="btn-mode btn-pvp" disabled>
+            <span>⚔️ Battle Match (PvP)</span>
+            <div class="pvp-info">
+                Under Construction<br>
+                <i>Coming soon...</i>
+            </div>
+        </button>
+        <div class="energy-note">Basic energy limit applies to all battles.</div>
+        
+        <div class="segment-title" style="margin-top: 12px;">
+            <span>📡 Top 15 Commanders</span>
+            <span style="font-size: 10px; font-weight: normal; color: #10b981;" id="onlineCountText">0 Online</span>
+        </div>
+        <div class="table-container">
+            <table class="micro-table" id="onlineTable">
+                <thead>
+                    <tr>
+                        <th class="rank-col">#</th>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th style="text-align: right;">Score</th>
+                        <th style="text-align: right;">Ping</th>
+                    </tr>
+                </thead>
+                <tbody id="onlineTableBody">
+                    <tr><td colspan="5" style="text-align:center; padding: 10px;">Loading radar...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">Support Development</div>
+        <p style="font-size:11px; color:#52525b; margin-bottom:8px; text-align:center;">
+            Help maintain the server & support developing further.
+        </p>
+        <a href="https://trakteer.id/cloudeight.main5tudio.dev" target="_blank" class="btn-trakteer">❤️ Dukung Saya di Trakteer</a>
+
+              <p style="font-size:11px; color:#52525b; margin-bottom:8px; text-align:center;">
+            Help maintain the server & support developing further.
+        </p>
+        <script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script><script type='text/javascript'>kofiwidget2.init('Support me on Ko-fi', '#d69245', 'M4M71XRWM2');kofiwidget2.draw();</script> 
+     
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">Message Board</div>
+        <div class="msg-list" id="msgList">
+            <div class="msg-item"><em>Loading messages...</em></div>
+        </div>
+        <textarea id="newMsg" rows="2" class="textarea-feedback" placeholder="Found a bug? Idea? Write to the dev..."></textarea>
+        <button class="btn-send" id="sendMsgBtn">Send Message</button>
+    </div>
+
+    <button class="btn-logout" id="logoutBtn">Logout</button>
+
+    <div style="text-align: center; font-size: 10px; color: #a1a1aa; margin-top: 10px;">
+        main5tudio.dev | 2026 productions
+    </div>
+
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, updateDoc, setDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAp9xtIX74D6Heihn6O-7muB0a6mbQno7Y",
+        authDomain: "glittz-of-horizon.firebaseapp.com",
+        projectId: "glittz-of-horizon",
+        storageBucket: "glittz-of-horizon.firebasestorage.app",
+        messagingSenderId: "862322605914",
+        appId: "1:862322605914:web:6f2c26e083dee7857d3d63"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Vanguard Avatars
+    const avatars = [
+        { id: "male_infantry", url: "https://ui-avatars.com/api/?name=⚔️&background=2ea32e&color=fff&size=128" },
+        { id: "male_horseman", url: "https://ui-avatars.com/api/?name=♞&background=333333&color=fff&size=128" },
+        { id: "male_sword", url: "https://ui-avatars.com/api/?name=🗡️&background=1e40af&color=fff&size=128" },
+        { id: "female_archer", url: "https://ui-avatars.com/api/?name=🏹&background=d93838&color=fff&size=128" },
+        { id: "female_mage", url: "https://ui-avatars.com/api/?name=🔮&background=8b5cf6&color=fff&size=128" },
+        { id: "female_cleric", url: "https://ui-avatars.com/api/?name=✨&background=ec4899&color=fff&size=128" }
+    ];
+
+    let currentUser = null;
+    let userDocRef = null;
+    let userData = null;
+
+    // UI Toggles
+    window.toggleAvatarModal = function() {
+        const modal = document.getElementById("avatarModal");
+        modal.style.display = modal.style.display === "block" ? "none" : "block";
+    }
+
+    // Class Pattern Logic
+    function getPatternTitle(inf, arch, horse, spear) {
+        const total = inf + arch + horse + spear;
+        if (total === 0) return "Recruit";
+        const i = inf/total, a = arch/total, h = horse/total, s = spear/total;
+
+        if (i >= 0.65 && a <= 0.35 && h <= 0.1)  return "Iron Linebreaker";
+        if (h >= 0.65 && i <= 0.35 && a <= 0.1)  return "Blitz Cavalry";
+        if (a >= 0.65 && i <= 0.1  && h <= 0.35) return "Phantom Skirmisher";
+        if (s >= 0.5)                              return "Phalanx Warden";
+        if (i >= 0.4 && a >= 0.2 && h >= 0.2)    return "Balanced Vanguard";
+        if (a >= 0.4 && i >= 0.2 && h >= 0.2)    return "Eagle Eye Marksman";
+        if (h >= 0.4 && i >= 0.2 && a >= 0.2)    return "Swift Flanker";
+        return "Tactical Commander";
+    }
+
+    function getPatternDesc(title) {
+        const descs = {
+            "Iron Linebreaker":    "Tembok pertahanan pejal, dominasi garis depan.",
+            "Blitz Cavalry":       "Pasukan kilat pengacau formasi musuh.",
+            "Phantom Skirmisher":  "Taktik hit-and-run mematikan dari bayang-bayang.",
+            "Phalanx Warden":      "Dinding tombak tak tergoyahkan. Musuh terpental sebelum menyentuh.",
+            "Balanced Vanguard":   "Seimbang dan tangguh di segala situasi medan tempur.",
+            "Eagle Eye Marksman":  "Fokus serangan jarak jauh yang presisi.",
+            "Swift Flanker":       "Mobilitas tinggi untuk manuver serangan sayap.",
+            "Tactical Commander":  "Ahli strategi adaptif.",
+            "Recruit":             "Memulai perjalanan di medan pertempuran."
+        };
+        return descs[title] || descs["Recruit"];
+    }
+
+    // Render Logic
+    function renderUserData() {
+        document.getElementById("playerName").innerText = userData.username || "Commander";
+        
+        const activeAvatar = avatars.find(a => a.id === userData.avatarId) || avatars[0];
+        document.getElementById("currentAvatar").src = activeAvatar.url;
+        renderAvatarModal();
+
+        // Stats Assignment
+        const w = userData.wins || 0, l = userData.losses || 0;
+        const totalDmg = userData.totalDamageDealt || 0;
+        const totalTurns = userData.totalTurnsTaken || 0;
+        const avgTurnWin = userData.avgTurnToWin || 0;
+        const avgTime = userData.avgTimePerTurn || 0;
+        const maxDmg = userData.maxDamagePerTurn || 0; // The highest damage in a single turn
+        
+        const inf = userData.infantryUsage || 0, arch = userData.archerUsage || 0,
+              horse = userData.horsemanUsage || 0, spear = userData.spearUsage || 0;
+        const avgDmgPerTurn = totalTurns > 0 ? Math.floor(totalDmg / totalTurns) : 0;
+        const currentTitle = getPatternTitle(inf, arch, horse, spear);
+
+        document.getElementById("stat-wins").innerText = w;
+        document.getElementById("stat-losses").innerText = l;
+        document.getElementById("stat-score").innerText = totalDmg;
+        document.getElementById("stat-rank").innerText = currentTitle;
+        document.getElementById("stat-avgturn").innerText = avgTurnWin;
+        document.getElementById("stat-avgdmg").innerText = avgDmgPerTurn;
+        document.getElementById("stat-maxdmg").innerText = maxDmg;
+        document.getElementById("stat-avgtime").innerText = avgTime + "s";
+
+        // Profile Text
+        document.getElementById("playerTitle").innerText = currentTitle;
+        document.getElementById("playerDesc").innerText = getPatternDesc(currentTitle);
+    }
+
+    function renderAvatarModal() {
+        const container = document.getElementById("avatarSelectorContainer");
+        container.innerHTML = "";
+        avatars.forEach(av => {
+            const img = document.createElement("img");
+            img.src = av.url;
+            img.className = "avatar-option" + (userData.avatarId === av.id ? " selected" : "");
+            img.addEventListener("click", async () => {
+                userData.avatarId = av.id;
+                document.getElementById("currentAvatar").src = av.url;
+                renderAvatarModal(); 
+                if (userDocRef) await updateDoc(userDocRef, { avatarId: av.id });
+                setTimeout(window.toggleAvatarModal, 150);
+            });
+            container.appendChild(img);
+        });
+    }
+
+    // Load Data
+    async function loadData(user) {
+        userDocRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+            userData = docSnap.data();
+        } else {
+            userData = {
+                username: user.displayName || "Commander", avatarId: "male_infantry",
+                wins: 0, losses: 0, totalDamageDealt: 0, totalTurnsTaken: 0,
+                avgTurnToWin: 0, avgTimePerTurn: 0, maxDamagePerTurn: 0,
+                infantryUsage: 0, archerUsage: 0, horsemanUsage: 0, spearUsage: 0,
+                battlesPlayedToday: 0, lastPlayedDate: "", isSpecialUser: false
+            };
+            await setDoc(userDocRef, userData);
+        }
+        renderUserData();
+    }
+
+    // Presence & Matchmaking
+    async function initPresence() {
+        if (!currentUser) return;
+        const presenceRef = doc(db, "presence", currentUser.uid);
+        const title = getPatternTitle(userData.infantryUsage||0, userData.archerUsage||0, userData.horsemanUsage||0, userData.spearUsage||0);
+        
+        await setDoc(presenceRef, {
+            uid: currentUser.uid, username: userData.username, title: title,
+            lastSeen: serverTimestamp(), score: (userData.totalDamageDealt || 0)
+        }, { merge: true });
+
+        setInterval(async () => {
+            if (currentUser) await updateDoc(presenceRef, { lastSeen: serverTimestamp() });
+        }, 30000);
+
+        const q = query(collection(db, "presence"), orderBy("score", "desc"));
+        onSnapshot(q, (snap) => {
+            const onlineCount = snap.size;
+            document.getElementById("onlineCountText").innerText = `🟢 ${onlineCount} Online`;
+
+            const tbody = document.getElementById("onlineTableBody");
+            tbody.innerHTML = "";
+            if (snap.empty) { tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>No one online</td></tr>"; return; }
+            
+            let count = 0;
+            snap.forEach(docSnap => {
+                if(count >= 15) return; 
+                const u = docSnap.data();
+                
+                let pingText = "now";
+                if(u.lastSeen) {
+                    const diffMins = Math.floor((new Date() - u.lastSeen.toDate()) / 60000);
+                    pingText = diffMins > 0 ? `${diffMins}m` : "<1m";
+                }
+
+                tbody.innerHTML += `<tr>
+                    <td class="rank-col">${count + 1}</td>
+                    <td><strong>${u.username || "Anon"}</strong></td>
+                    <td style="color:#71717a;">${u.title || "Recruit"}</td>
+                    <td class="score-col">${u.score || 0}</td>
+                    <td style="text-align:right; color:#a1a1aa;">${pingText}</td>
+                </tr>`;
+                count++;
+            });
+        });
+    }
+
+    // Message Board
+    function loadMessages() {
+        const q = query(collection(db, "supportMessages"), orderBy("timestamp", "desc"));
+        onSnapshot(q, (snap) => {
+            const msgListDiv = document.getElementById("msgList");
+            msgListDiv.innerHTML = "";
+            if (snap.empty) {
+                msgListDiv.innerHTML = "<div class='msg-item'>No messages yet. Be the first!</div>";
+                return;
+            }
+            snap.forEach(docSnap => {
+                const msg = docSnap.data();
+                const date = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleDateString() : "now";
+                msgListDiv.innerHTML += `
+                    <div class="msg-item">
+                        <strong style="color:#0f172a;">${msg.userName}</strong> <span style="font-size:9px; color:#a1a1aa;">${date}</span><br>
+                        <span style="color:#3f3f46;">${msg.message}</span>
+                        ${msg.reply ? `<div class="dev-reply">🔹 Dev: ${msg.reply}</div>` : ""}
+                    </div>
+                `;
+            });
+        });
+    }
+
+    // Auth Observer
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user;
+            await loadData(user);
+            initPresence();
+            loadMessages();
+        } else {
+            window.location.href = "login-signup.html";
+        }
+    });
+
+    // Buttons
+    document.getElementById("editNameBtn").addEventListener("click", async () => {
+        const newName = prompt("Enter new name (Allowed once per month):");
+        if(newName && newName.trim() !== "") {
+            const sanitized = newName.substring(0, 15);
+            document.getElementById("playerName").innerText = sanitized;
+            if (userDocRef) {
+                await updateDoc(userDocRef, { username: sanitized });
+                userData.username = sanitized;
+            }
+        }
+    });
+
+    document.getElementById("banditBtn").addEventListener("click", async () => {
+        const today    = new Date().toDateString();
+        const lastDate = userData.lastPlayedDate || "";
+        // Reset counter if new day
+        if (lastDate !== today) {
+            userData.battlesPlayedToday = 0;
+            userData.lastPlayedDate = today;
+            if (userDocRef) await updateDoc(userDocRef, { battlesPlayedToday: 0, lastPlayedDate: today });
+        }
+        const battlesToday = userData.battlesPlayedToday || 0;
+        if (!userData.isSpecialUser && battlesToday >= 8) {
+            alert("No daily energy left. Support us on Trakteer for unlimited battles.");
+            return;
+        }
+        window.location.href = "battle.html?mode=bandit";
+    });
+
+    document.getElementById("sendMsgBtn").addEventListener("click", async () => {
+        const text = document.getElementById("newMsg").value.trim();
+        if (!text || !currentUser) return alert("Write a message first.");
+        await addDoc(collection(db, "supportMessages"), {
+            userId: currentUser.uid, userName: userData.username, message: text,
+            timestamp: serverTimestamp(), reply: null
+        });
+        document.getElementById("newMsg").value = "";
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
+
+</script>
+</body>
+</html>

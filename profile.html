@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | Advanced Profile</title>
+    <script src="js/game.config.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px; 
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        /* Segment Containers */
+        .segment {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #e4e4e7;
+        }
+        .segment-title {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #18181b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Tab Nav — World / Profile / Friends / Setting */
+        .tab-nav { display: flex; background: #ffffff; border-radius: 12px; border: 1px solid #e4e4e7; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .tab-item { flex: 1; text-align: center; padding: 10px 4px; font-size: 12px; font-weight: bold; color: #71717a; text-decoration: none; border-right: 1px solid #e4e4e7; transition: 0.15s; }
+        .tab-item:last-child { border-right: none; }
+        .tab-item:active { background: #f4f4f5; }
+        .tab-active { color: #3f51b5; background: #eef0fc; }
+        .tab-disabled { color: #d4d4d8; cursor: not-allowed; }
+
+        /* Top Profile Layout */
+        .profile-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+        .profile-info { width: 65%; display: flex; flex-direction: column; gap: 4px; }
+        .profile-pic-wrapper { width: 35%; display: flex; justify-content: flex-end; position: relative; }
+
+        /* Typography & Name Area */
+        .name-row { display: flex; align-items: center; gap: 6px; }
+        .name-text { font-size: 18px; font-weight: bold; color: rgba(0, 0, 0, 0.85); }
+        .edit-btn { background: #f4f4f5; border: 1px solid #d4d4d8; border-radius: 4px; cursor: pointer; font-size: 10px; padding: 2px 6px; color: #52525b; }
+        .rename-limit { font-size: 9px; color: #a1a1aa; background: #f4f4f5; padding: 2px 4px; border-radius: 6px; }
+
+        /* Title & Desc */
+        .title-text { font-size: 13px; font-weight: bold; color: #3f3f46; }
+        .title-desc { font-size: 11px; font-style: italic; color: #71717a; line-height: 1.3; }
+
+        /* Avatar */
+        .avatar-img { width: 65px; height: 65px; border-radius: 10px; object-fit: cover; border: 1px solid #d4d4d8; cursor: pointer; transition: 0.2s; }
+        .avatar-img:hover { opacity: 0.8; border-color: #3b82f6; }
+        .avatar-modal { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e4e4e7; width: 100%; }
+        .avatar-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .avatar-option { width: 100%; aspect-ratio: 1; border-radius: 8px; cursor: pointer; border: 2px solid transparent; background: #f8fafc; }
+        .avatar-option.selected { border-color: #3b82f6; transform: scale(1.05); }
+
+        /* 8-Point Statistical Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 10px; text-align: center; }
+        .stat-item { background: #f8fafc; padding: 8px 2px; border-radius: 6px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; justify-content: center;}
+        .stat-val { font-weight: bold; font-size: 13px; color: #0f172a; margin-bottom: 2px; }
+        .stat-label { color: #52525b; line-height: 1.1; }
+        .stat-highlight { color: #2563eb; font-size: 11px; }
+
+        /* Game Modes */
+        .modes-grid { display: flex; flex-direction: column; gap: 8px; }
+        .btn-mode { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 13px; cursor: pointer; }
+        
+        /* Bandit Active */
+        .btn-bandit { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; box-shadow: 0 2px 4px rgba(55,48,163,0.1); }
+        /* PvP Disabled */
+        .btn-pvp { background: #f4f4f5; color: #a1a1aa; border: 1px dashed #d4d4d8; cursor: not-allowed; }
+        .pvp-info { font-size: 10px; font-weight: normal; color: #71717a; text-align: right; }
+        /* PvP Local Test Active */
+        .btn-pvp-local { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; box-shadow: 0 2px 4px rgba(22,101,52,0.1); }
+        /* PvP Online Active */
+        .btn-pvp-online { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; box-shadow: 0 2px 4px rgba(30,64,175,0.1); }
+        
+        .energy-note { font-size: 10px; text-align: center; color: #71717a; margin-top: 2px; }
+        
+        /* Top 15 Micro Table */
+        .table-container { max-height: 160px; overflow-y: auto; border: 1px solid #e4e4e7; border-radius: 6px; }
+        .micro-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; background: #fafafa; }
+        .micro-table th { background: #f4f4f5; padding: 6px; position: sticky; top: 0; color: #52525b; font-weight: bold; border-bottom: 1px solid #e4e4e7; z-index: 1;}
+        .micro-table td { padding: 5px 6px; border-bottom: 1px solid #f4f4f5; color: #27272a; }
+        .micro-table tr:last-child td { border-bottom: none; }
+        .score-col { font-weight: bold; color: #047857; text-align: right; }
+        .rank-col { color: #a1a1aa; width: 20px; text-align: center; font-weight: bold;}
+
+        /* Support Block */
+        .btn-trakteer { display: block; width: 100%; background: #be1e2d; color: white; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; text-decoration: none; border: none; }
+        
+        /* Feedback & Messages */
+        .msg-list { max-height: 120px; overflow-y: auto; font-size: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .msg-item { background: #f8fafc; border-radius: 6px; padding: 6px; border: 1px solid #f1f5f9; }
+        .dev-reply { background: #e0e7ff; padding: 4px; border-radius: 4px; margin-top: 4px; color: #3730a3; border-left: 2px solid #3730a3;}
+        .textarea-feedback { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d4d4d8; font-size: 11px; font-family: inherit; resize: none; margin-bottom: 6px; background: #f8fafc; }
+        .btn-send { width: 100%; background: #3b82f6; color: white; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 12px; border: none; cursor: pointer; }
+
+        /* Logout */
+        .btn-logout { width: 100%; background: #e4e4e7; color: #52525b; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; border: none; cursor: pointer; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="segment profile-header">
+        <div class="profile-info">
+            <div class="name-row">
+                <span class="name-text" id="playerName">Loading...</span>
+                <button class="edit-btn" id="editNameBtn">Edit</button>
+                <span class="rename-limit">1/mo</span>
+            </div>
+            <div class="title-text" id="playerTitle">Recruit</div>
+            <div class="title-desc" id="playerDesc">Memulai perjalanan di medan pertempuran.</div>
+        </div>
+        <div class="profile-pic-wrapper">
+            <img src="https://ui-avatars.com/api/?name=...&background=e4e4e7&color=fff&size=128" alt="Profile" class="avatar-img" id="currentAvatar" onclick="toggleAvatarModal()">
+        </div>
+
+        <div class="avatar-modal" id="avatarModal">
+            <div style="font-size: 11px; margin-bottom: 6px; font-weight: bold; color: #52525b;">Select Vanguard Banner:</div>
+            <div class="avatar-grid" id="avatarSelectorContainer"></div>
+        </div>
+    </div>
+
+    <div class="tab-nav" id="mainTabNav">
+        <a href="world.html" class="tab-item">World</a>
+        <a href="profile.html" class="tab-item tab-active">Profile</a>
+        <a href="friends.html" class="tab-item">Friendly</a>
+        <a href="settings.html" class="tab-item">Setting</a>
+    </div>
+
+    <div class="segment">
+        <div class="stats-grid">
+            <div class="stat-item"><div class="stat-val" id="stat-wins">0</div><div class="stat-label">Wins</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-losses">0</div><div class="stat-label">Losses</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-score">0</div><div class="stat-label">Score</div></div>
+            <div class="stat-item"><div class="stat-val stat-highlight" id="stat-rank">Recruit</div><div class="stat-label">Class</div></div>
+            
+            <div class="stat-item"><div class="stat-val" id="stat-avgturn">0</div><div class="stat-label">Avg Turns</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-avgdmg">0</div><div class="stat-label">Avg Dmg</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-maxdmg">0</div><div class="stat-label">Max Dmg</div></div>
+            <div class="stat-item"><div class="stat-val" id="stat-avgtime">0s</div><div class="stat-label">Avg Time</div></div>
+        </div>
+    </div>
+
+    <div class="segment modes-grid">
+        <button class="btn-mode btn-bandit" id="banditBtn">
+            <span>🛡️ Bandit Match (vs AI)</span>
+            <span style="font-size:11px; font-weight:normal;">Active Mode</span>
+        </button>
+        
+        <button class="btn-mode btn-pvp-local" id="pvpLocalBtn">
+            <span>📶 PvP Match (Bluetooth/Wi-Fi)</span>
+            <span style="font-size:11px; font-weight:normal;">Local test mode</span>
+        </button>
+
+        <button class="btn-mode btn-pvp-online" id="pvpOnlineBtn">
+            <span>🌐 PvP Online</span>
+            <span style="font-size:11px; font-weight:normal;">Play anywhere, share a code</span>
+        </button>
+        <div class="energy-note">Basic energy limit applies to all battles.</div>
+        
+        <div class="segment-title" style="margin-top: 12px;">
+            <span>📡 Top 15 Commanders</span>
+            <span style="font-size: 10px; font-weight: normal; color: #10b981;" id="onlineCountText">0 Online</span>
+        </div>
+        <div class="table-container">
+            <table class="micro-table" id="onlineTable">
+                <thead>
+                    <tr>
+                        <th class="rank-col">#</th>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th style="text-align: right;">Score</th>
+                        <th style="text-align: right;">Ping</th>
+                    </tr>
+                </thead>
+                <tbody id="onlineTableBody">
+                    <tr><td colspan="5" style="text-align:center; padding: 10px;">Loading radar...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!--
+      ==========================================================================
+      WHAT: "Support Develop" card — rebuilt to match your sketch layout.
+      CHANGE FROM PREVIOUS VERSION: Ko-fi is no longer a JS-powered floating
+             widget (overlay-widget.js). It's now a plain <a> link, styled
+             identically to Trakteer, sitting inside one shared bordered box.
+      WHY THIS IS BETTER:
+             1. Matches your sketch exactly — both buttons live in one card,
+                Trakteer on top, Ko-fi below, each with its own caption line.
+             2. No JS = no more "Ko-fi widget failed to load" warning in
+                Claude's preview (that error only ever existed because of
+                the external overlay-widget.js script; a plain link has
+                nothing to fail).
+             3. No floating bubble covering other UI on the page anymore.
+      LEARNING: A donation "widget" isn't required for a donation link to
+             work — Ko-fi/Trakteer/almost every platform gives you a normal
+             URL. Widgets just add visual flair (animated bubble, popup) at
+             the cost of an external script dependency. Plain links are
+             simpler, faster to load, and have nothing that can break.
+      ==========================================================================
+    -->
+    <div class="segment" style="border: 2px solid #e8a33d; border-radius: 12px;">
+        <div class="segment-title">Support Development</div>
+
+        <!--
+          WHAT: Opening progress message — replaces the grey divider that
+                 used to sit directly under the title.
+          LEARNING: margin-bottom here is what creates the "bit spacial
+                 between this to each button" gap you asked for — it's the
+                 space below THIS paragraph, pushing the Trakteer button
+                 further down rather than sitting flush against it.
+        -->
+        <p style="width:100%; box-sizing:border-box; font-size:11px; color:#57534e; text-align:center; margin: 4px 0 20px; line-height:1.6;">
+            We are still working hard on every goal and improvement. Monthly updates will be provided, while we continue promoting our game to gamer communities worldwide.
+        </p>
+
+        <a id="trakteerBtn" href="https://trakteer.id/cloudeight.main5tudio.dev" target="_blank" class="btn-trakteer" style="background:#c0603d;">Support via <b>Trakteer</b> 🍲</a>
+        <p style="font-size:11px; color:#78716c; text-align:center; margin: 4px 0 22px;">
+            Treat us to meals and a refresh. <b>IDR default.</b>
+        </p>
+
+        <a id="kofiBtn" href="https://ko-fi.com/main5tudiodev" target="_blank" class="btn-trakteer" style="background:#d69245;">Support via <b>KO-FI</b> ☕ 🕶️</a>
+        <p style="font-size:11px; color:#78716c; text-align:center; margin: 4px 0 22px;">
+            Saving toward better hardware and registrations. <b>USD default.</b>
+        </p>
+
+        <!--
+          WHAT: Footer divider + reward-teaser sentence.
+          LEARNING: Same <hr> pattern as before, just with more margin above
+                 it now ("bit spacial to grey line"). The footer paragraph
+                 below uses width:100% + box-sizing:border-box so it fills
+                 the card edge-to-edge instead of shrinking to fit its text,
+                 while text-align:center keeps the text itself centered
+                 within that full-width strip.
+        -->
+        <hr style="border:none; border-top:1px solid #d6d3d1; margin: 10px 0 12px;">
+        <p style="width:100%; box-sizing:border-box; font-size:11px; color:#a8a29e; text-align:center; margin: 0 0 8px; line-height:1.5;">
+            We may send back rewards and appreciation gifts to supporters — PDFs, badges, extra tokens, and more.
+        </p>
+
+        <!--
+          ==========================================================================
+          WHAT: Replaces the old email input box entirely. Tapping either
+                 support button now does three things automatically, with
+                 NO amount/nominal ever asked or known:
+                 1. Posts a short public confirmation into the Message
+                    Board (same "supportMessages" collection already
+                    rendered there) — e.g. "🍲 [name] supported via
+                    Trakteer" — visible to other users as social proof.
+                 2. Logs a detailed private record into a new
+                    "supporterLog" collection — timestamp, platform,
+                    userId, username — meant for YOU to view as an
+                    admin table (e.g. in the Firebase console's Firestore
+                    tab, or a future admin.html page), not shown publicly.
+                 3. Sends YOU an email notification, via EmailJS (see
+                    setup note below), to main5tudio.develop@gmail.com.
+          WHY NOT JUST FIRESTORE FOR THE EMAIL PART: Firestore only
+                 stores data — it can't send an email by itself. Actually
+                 emailing you requires either a paid Firebase Cloud
+                 Function (backend code, needs the Blaze billing plan) or
+                 a client-side email service. EmailJS was chosen because
+                 it works entirely from the browser with no backend and
+                 no paid plan required (free tier covers ~200 emails/month),
+                 which matches your no-backend, Acode-only workflow.
+          SETUP YOU STILL NEED TO DO (can't be done for you, it's account-
+                 specific): 
+                 1. Create a free account at https://www.emailjs.com
+                 2. Add an Email Service (connect your Gmail) and an Email
+                    Template — EmailJS's dashboard walks through both.
+                 3. Replace the three placeholders below —
+                    YOUR_EMAILJS_PUBLIC_KEY, YOUR_SERVICE_ID,
+                    YOUR_TEMPLATE_ID — with the values EmailJS gives you.
+                 Until those are filled in, the Firestore logging (steps 1
+                 and 2 above) still works fine on its own — only the email
+                 step will silently fail (caught safely, won't break the
+                 button).
+          ==========================================================================
+        -->
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+        <script>
+            (function() {
+                if (typeof emailjs !== 'undefined') {
+                    emailjs.init({ publicKey: "YOUR_EMAILJS_PUBLIC_KEY" });
+                }
+            })();
+        </script>
+    </div>
+
+
+
+    <div class="segment">
+        <div class="segment-title">Message Board</div>
+        <div class="msg-list" id="msgList">
+            <div class="msg-item"><em>Loading messages...</em></div>
+        </div>
+        <textarea id="newMsg" rows="2" class="textarea-feedback" placeholder="Found a bug? Idea? Write to the dev..."></textarea>
+        <button class="btn-send" id="sendMsgBtn">Send Message</button>
+    </div>
+
+    <button class="btn-logout" id="logoutBtn">Logout</button>
+
+    <div style="text-align: center; font-size: 10px; color: #a1a1aa; margin-top: 10px;">
+        main5tudio.dev | 2026 productions
+    </div>
+
+</div>
+
+<script type="module">
+    import {
+        auth, db, onAuthStateChanged, signOut,
+        doc, getDoc, updateDoc, setDoc,
+        collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
+        ensureUserDoc
+    } from "./js/firebase.config.js";
+    import { Presence } from "./js/presence.js";
+
+    // Vanguard Avatars
+    const avatars = [
+        { id: "male_infantry", url: "https://ui-avatars.com/api/?name=⚔️&background=2ea32e&color=fff&size=128" },
+        { id: "male_horseman", url: "https://ui-avatars.com/api/?name=♞&background=333333&color=fff&size=128" },
+        { id: "male_sword", url: "https://ui-avatars.com/api/?name=🗡️&background=1e40af&color=fff&size=128" },
+        { id: "female_archer", url: "https://ui-avatars.com/api/?name=🏹&background=d93838&color=fff&size=128" },
+        { id: "female_mage", url: "https://ui-avatars.com/api/?name=🔮&background=8b5cf6&color=fff&size=128" },
+        { id: "female_cleric", url: "https://ui-avatars.com/api/?name=✨&background=ec4899&color=fff&size=128" }
+    ];
+
+    let currentUser = null;
+    let userDocRef = null;
+    let userData = null;
+
+    // UI Toggles
+    window.toggleAvatarModal = function() {
+        const modal = document.getElementById("avatarModal");
+        modal.style.display = modal.style.display === "block" ? "none" : "block";
+    }
+
+    // Class title logic now lives in one place: js/game.config.js's
+    // getCombatTitle()/getTitleDesc(), same functions clan-assessment.html
+    // uses. This page used to carry its own near-duplicate (getPatternTitle/
+    // getPatternDesc) with slightly different thresholds — drifted from the
+    // canonical version at some point. Removed in favor of the shared one.
+
+    // Render Logic
+    function renderUserData() {
+        document.getElementById("playerName").innerText = userData.username || "Commander";
+        
+        const activeAvatar = avatars.find(a => a.id === userData.avatarId) || avatars[0];
+        document.getElementById("currentAvatar").src = activeAvatar.url;
+        renderAvatarModal();
+
+        // Stats Assignment
+        const w = userData.wins || 0, l = userData.losses || 0;
+        const totalDmg = userData.totalDamageDealt || 0;
+        const totalTurns = userData.totalTurnsTaken || 0;
+        const avgTurnWin = userData.avgTurnToWin || 0;
+        const avgTime = userData.avgTimePerTurn || 0;
+        const maxDmg = userData.maxDamagePerTurn || 0; // The highest damage in a single turn
+        
+        const inf = userData.infantryUsage || 0, arch = userData.archerUsage || 0,
+              horse = userData.horsemanUsage || 0, spear = userData.spearUsage || 0;
+        const avgDmgPerTurn = totalTurns > 0 ? Math.floor(totalDmg / totalTurns) : 0;
+        const currentTitle = getCombatTitle(inf, arch, horse, spear);
+
+        document.getElementById("stat-wins").innerText = w;
+        document.getElementById("stat-losses").innerText = l;
+        document.getElementById("stat-score").innerText = totalDmg;
+        document.getElementById("stat-rank").innerText = currentTitle;
+        document.getElementById("stat-avgturn").innerText = avgTurnWin;
+        document.getElementById("stat-avgdmg").innerText = avgDmgPerTurn;
+        document.getElementById("stat-maxdmg").innerText = maxDmg;
+        document.getElementById("stat-avgtime").innerText = avgTime + "s";
+
+        // Profile Text
+        document.getElementById("playerTitle").innerText = currentTitle;
+        document.getElementById("playerDesc").innerText = getTitleDesc(currentTitle);
+    }
+
+    function renderAvatarModal() {
+        const container = document.getElementById("avatarSelectorContainer");
+        container.innerHTML = "";
+        avatars.forEach(av => {
+            const img = document.createElement("img");
+            img.src = av.url;
+            img.className = "avatar-option" + (userData.avatarId === av.id ? " selected" : "");
+            img.addEventListener("click", async () => {
+                userData.avatarId = av.id;
+                document.getElementById("currentAvatar").src = av.url;
+                renderAvatarModal(); 
+                if (userDocRef) await updateDoc(userDocRef, { avatarId: av.id });
+                setTimeout(window.toggleAvatarModal, 150);
+            });
+            container.appendChild(img);
+        });
+    }
+
+    // Load Data
+    // ensureUserDoc() dari firebase.config.js = satu-satunya tempat yang
+    // membuat/melengkapi dokumen users/{uid}, jadi skemanya selalu sama
+    // persis dengan yang dibuat saat register di login-signup.html.
+    async function loadData(user) {
+        userDocRef = doc(db, "users", user.uid);
+        userData = await ensureUserDoc(user);
+        renderUserData();
+    }
+
+    // Presence & Matchmaking — the write-half now lives in js/presence.js
+    // (Presence.markOnline), shared with the Friendly tab's nearby-looking
+    // status so they can't clobber each other. This function keeps the
+    // leaderboard read/render, which is specific to this page.
+    async function initPresence() {
+        if (!currentUser) return;
+        await Presence.markOnline(userData);
+
+        const q = query(collection(db, "presence"), orderBy("score", "desc"));
+        onSnapshot(q, (snap) => {
+            const onlineCount = snap.size;
+            document.getElementById("onlineCountText").innerText = `🟢 ${onlineCount} Online`;
+
+            const tbody = document.getElementById("onlineTableBody");
+            tbody.innerHTML = "";
+            if (snap.empty) { tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>No one online</td></tr>"; return; }
+            
+            let count = 0;
+            snap.forEach(docSnap => {
+                if(count >= 15) return; 
+                const u = docSnap.data();
+                
+                let pingText = "now";
+                if(u.lastSeen) {
+                    const diffMins = Math.floor((new Date() - u.lastSeen.toDate()) / 60000);
+                    pingText = diffMins > 0 ? `${diffMins}m` : "<1m";
+                }
+
+                tbody.innerHTML += `<tr>
+                    <td class="rank-col">${count + 1}</td>
+                    <td><strong>${u.username || "Anon"}</strong></td>
+                    <td style="color:#71717a;">${u.title || "Recruit"}</td>
+                    <td class="score-col">${u.score || 0}</td>
+                    <td style="text-align:right; color:#a1a1aa;">${pingText}</td>
+                </tr>`;
+                count++;
+            });
+        });
+    }
+
+    // Message Board
+    function loadMessages() {
+        const q = query(collection(db, "supportMessages"), orderBy("timestamp", "desc"));
+        onSnapshot(q, (snap) => {
+            const msgListDiv = document.getElementById("msgList");
+            msgListDiv.innerHTML = "";
+            if (snap.empty) {
+                msgListDiv.innerHTML = "<div class='msg-item'>No messages yet. Be the first!</div>";
+                return;
+            }
+            snap.forEach(docSnap => {
+                const msg = docSnap.data();
+                const date = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleDateString() : "now";
+                msgListDiv.innerHTML += `
+                    <div class="msg-item">
+                        <strong style="color:#0f172a;">${msg.userName}</strong> <span style="font-size:9px; color:#a1a1aa;">${date}</span><br>
+                        <span style="color:#3f3f46;">${msg.message}</span>
+                        ${msg.reply ? `<div class="dev-reply">🔹 Dev: ${msg.reply}</div>` : ""}
+                    </div>
+                `;
+            });
+        });
+    }
+
+    // Auth Observer
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user;
+            await loadData(user);
+            initPresence();
+            loadMessages();
+        } else {
+            window.location.href = "login-signup.html";
+        }
+    });
+
+    // Buttons
+    document.getElementById("editNameBtn").addEventListener("click", async () => {
+        const newName = prompt("Enter new name (Allowed once per month):");
+        if(newName && newName.trim() !== "") {
+            const sanitized = newName.substring(0, 15);
+            document.getElementById("playerName").innerText = sanitized;
+            if (userDocRef) {
+                await updateDoc(userDocRef, { username: sanitized });
+                userData.username = sanitized;
+            }
+        }
+    });
+
+    document.getElementById("banditBtn").addEventListener("click", async () => {
+        const today    = new Date().toDateString();
+        const lastDate = userData.lastPlayedDate || "";
+        // Reset counter if new day
+        if (lastDate !== today) {
+            userData.battlesPlayedToday = 0;
+            userData.lastPlayedDate = today;
+            if (userDocRef) await updateDoc(userDocRef, { battlesPlayedToday: 0, lastPlayedDate: today });
+        }
+        const battlesToday = userData.battlesPlayedToday || 0;
+        if (!userData.isSpecialUser && battlesToday >= 8) {
+            alert("No daily energy left. Support us on Trakteer for unlimited battles.");
+            return;
+        }
+        window.location.href = "battle.html?mode=bandit";
+    });
+
+    document.getElementById("pvpLocalBtn").addEventListener("click", () => {
+        window.location.href = "pvplocaltest.html";
+    });
+
+    document.getElementById("pvpOnlineBtn").addEventListener("click", () => {
+        window.location.href = "pvponline.html";
+    });
+
+    document.getElementById("sendMsgBtn").addEventListener("click", async () => {
+        const text = document.getElementById("newMsg").value.trim();
+        if (!text || !currentUser) return alert("Write a message first.");
+        await addDoc(collection(db, "supportMessages"), {
+            userId: currentUser.uid, userName: userData.username, message: text,
+            timestamp: serverTimestamp(), reply: null
+        });
+        document.getElementById("newMsg").value = "";
+    });
+
+    // WHAT: One shared function that fires whenever a support button is
+    //        tapped. Called once per platform (Trakteer / Ko-fi) below.
+    // LEARNING: Writing this as one reusable function instead of copy-pasting
+    //        the same logic twice means if you ever want to change WHAT
+    //        happens on a support click (add a 3rd platform, change the
+    //        message wording, etc.), you only edit it in one place.
+    async function logSupportClick(platform, icon) {
+        const uid = currentUser?.uid || null;
+        const name = userData?.username || "Someone";
+
+        // 1. Public confirmation posted to the Message Board — no amount,
+        //    just a friendly "this happened" note visible to other users.
+        await addDoc(collection(db, "supportMessages"), {
+            userId: uid, userName: name,
+            message: `${icon} ${name} supported via ${platform}!`,
+            timestamp: serverTimestamp(), reply: null, isSystemNotice: true
+        });
+
+        // 2. Private detailed record for you as admin — full details,
+        //    kept in its own collection so it never mixes with public
+        //    Message Board posts. View it under Firestore > supporterLog
+        //    in your Firebase console, or build a simple admin.html table
+        //    later that queries this collection.
+        await addDoc(collection(db, "supporterLog"), {
+            userId: uid, userName: name, platform: platform,
+            timestamp: serverTimestamp()
+        });
+
+        // 3. Email notification to you — only runs if EmailJS has been
+        //    set up (see the setup note in the HTML above). Wrapped in
+        //    try/catch so a missing/incomplete EmailJS setup never blocks
+        //    steps 1 and 2, or throws a visible error to the user.
+        try {
+            if (typeof emailjs !== 'undefined') {
+                await emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", {
+                    to_email: "main5tudio.develop@gmail.com",
+                    platform: platform, user_name: name, user_id: uid || "guest"
+                });
+            }
+        } catch (err) {
+            console.warn("EmailJS notification skipped (not fully set up yet):", err);
+        }
+    }
+
+    document.getElementById("trakteerBtn").addEventListener("click", () => {
+        logSupportClick("Trakteer", "🍲");
+    });
+    document.getElementById("kofiBtn").addEventListener("click", () => {
+        logSupportClick("Ko-fi", "☕");
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
+
+</script>
+</body>
+</html>

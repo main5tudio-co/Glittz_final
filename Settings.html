@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | Settings</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+
+        .segment { background: #ffffff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e4e4e7; }
+        .segment-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #18181b; }
+
+        /* Tab Nav — kept identical to profile.html */
+        .tab-nav { display: flex; background: #ffffff; border-radius: 12px; border: 1px solid #e4e4e7; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .tab-item { flex: 1; text-align: center; padding: 10px 4px; font-size: 12px; font-weight: bold; color: #71717a; text-decoration: none; border-right: 1px solid #e4e4e7; transition: 0.15s; }
+        .tab-item:last-child { border-right: none; }
+        .tab-item:active { background: #f4f4f5; }
+        .tab-active { color: #3f51b5; background: #eef0fc; }
+        .tab-disabled { color: #d4d4d8; cursor: not-allowed; }
+
+        /* Settings form */
+        .field-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .field-label { font-size: 11px; font-weight: bold; color: #52525b; }
+        .field-input { font-size: 13px; padding: 8px 10px; border: 1px solid #d4d4d8; border-radius: 8px; background: #fafafa; color: #27272a; }
+        .field-input:focus { outline: none; border-color: #3f51b5; background: #ffffff; }
+        .save-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #3f51b5; color: #fff; font-weight: bold; font-size: 13px; cursor: pointer; margin-top: 4px; }
+        .save-btn:active { background: #303f9f; }
+        .danger-btn { width: 100%; padding: 10px; border: 1px solid #ef4444; border-radius: 8px; background: #fff; color: #ef4444; font-weight: bold; font-size: 12px; cursor: pointer; margin-top: 8px; }
+        .settings-note { font-size: 10px; color: #a1a1aa; margin-top: 4px; }
+
+        /* Milestones */
+        .milestone-row { margin-bottom: 12px; }
+        .milestone-label { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; color: #52525b; margin-bottom: 4px; }
+        .milestone-count { color: #3f51b5; }
+        .milestone-bar-track { width: 100%; height: 8px; border-radius: 4px; background: #f4f4f5; overflow: hidden; }
+        .milestone-bar-fill { height: 100%; background: #3f51b5; border-radius: 4px; transition: width 0.3s; }
+        .milestone-bar-fill.done { background: #10b981; }
+        .clan-unlock-btn { width: 100%; padding: 11px; border: none; border-radius: 8px; background: #7c3aed; color: #fff; font-weight: bold; font-size: 13px; cursor: pointer; margin-top: 4px; }
+        .clan-unlock-btn:active { background: #6d28d9; }
+        .clan-locked-note { font-size: 10px; color: #a1a1aa; text-align: center; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="tab-nav" id="mainTabNav">
+        <a href="world.html" class="tab-item">World</a>
+        <a href="profile.html" class="tab-item">Profile</a>
+        <a href="friends.html" class="tab-item">Friendly</a>
+        <a href="settings.html" class="tab-item tab-active">Setting</a>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">🔐 Account</div>
+        <div class="field-group">
+            <label class="field-label" for="settingsEmail">Email</label>
+            <input class="field-input" type="email" id="settingsEmail" placeholder="you@example.com" disabled>
+        </div>
+        <div class="field-group">
+            <label class="field-label" for="settingsPassword">New Password</label>
+            <input class="field-input" type="password" id="settingsPassword" placeholder="••••••••">
+            <div class="settings-note">Min 6 karakter. Kosongkan jika tidak diganti.</div>
+        </div>
+        <button class="save-btn" onclick="saveAccountSettings()">Save Changes</button>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">⚙️ Preferences</div>
+        <div class="field-group">
+            <label class="field-label" for="settingsSound">Sound Effects</label>
+            <select class="field-input" id="settingsSound">
+                <option value="on">On</option>
+                <option value="off">Off</option>
+            </select>
+        </div>
+        <div class="field-group">
+            <label class="field-label" for="settingsBgm">Background Music</label>
+            <select class="field-input" id="settingsBgm">
+                <option value="on">On</option>
+                <option value="off">Off</option>
+            </select>
+        </div>
+        <button class="save-btn" onclick="savePreferences()">Save Preferences</button>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">🎖️ Milestones</div>
+
+        <div class="milestone-row">
+            <div class="milestone-label">
+                <span>🛡️ Bandit Fights</span>
+                <span class="milestone-count"><span id="banditCount">0</span>/20</span>
+            </div>
+            <div class="milestone-bar-track"><div class="milestone-bar-fill" id="banditBar" style="width:0%"></div></div>
+        </div>
+
+        <div class="milestone-row">
+            <div class="milestone-label">
+                <span>📶 Bluetooth/Wi-Fi PvP</span>
+                <span class="milestone-count"><span id="pvpCount">0</span>/10</span>
+            </div>
+            <div class="milestone-bar-track"><div class="milestone-bar-fill" id="pvpBar" style="width:0%"></div></div>
+        </div>
+
+        <button class="clan-unlock-btn hidden" id="clanUnlockBtn">📋 Clan Assessment — Test / Register</button>
+        <div class="clan-locked-note" id="clanLockedNote">Hit both milestones to unlock the clan assessment.</div>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title" style="color:#ef4444;">Danger Zone</div>
+        <button class="danger-btn" onclick="confirmSignOut()">Sign Out</button>
+    </div>
+
+</div>
+
+<script>
+    // ─────────────────────────────────────────────────────
+    //  SETTINGS
+    //  TODO: wire to firebase.config.js — auth.currentUser.email,
+    //  updatePassword(), and a per-user "prefs" doc in Firestore.
+    // ─────────────────────────────────────────────────────
+
+    function saveAccountSettings() {
+        const pw = document.getElementById('settingsPassword').value;
+        if (pw && pw.length < 6) {
+            alert('Password minimal 6 karakter.');
+            return;
+        }
+        // TODO: call Firebase updatePassword(auth.currentUser, pw)
+        alert('Account settings saved (placeholder — belum terhubung ke Firebase).');
+    }
+
+    function savePreferences() {
+        const sound = document.getElementById('settingsSound').value;
+        const bgm = document.getElementById('settingsBgm').value;
+        // TODO: persist to Firestore prefs doc or localStorage fallback
+        alert('Preferences saved (placeholder).');
+    }
+</script>
+
+<script type="module">
+    // ─────────────────────────────────────────────────────
+    //  MILESTONE METERS + REAL SIGN-OUT
+    //  Drive-by fix: confirmSignOut was a placeholder that never
+    //  called Firebase — wired it here alongside the new meters
+    //  since both need the same auth import anyway.
+    // ─────────────────────────────────────────────────────
+    import { auth, db, onAuthStateChanged, ensureUserDoc, signOut } from "./js/firebase.config.js";
+
+    const BANDIT_GOAL = 20;
+    const PVP_GOAL = 10;
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.href = "login-signup.html"; return; }
+        document.getElementById('settingsEmail').value = user.email || '';
+
+        const userData = await ensureUserDoc(user);
+        const banditCount = userData.banditBattlesCount || 0;
+        const pvpCount = userData.pvpLocalBattlesCount || 0;
+
+        document.getElementById('banditCount').textContent = banditCount;
+        document.getElementById('pvpCount').textContent = pvpCount;
+        const banditPct = Math.min(100, Math.round((banditCount / BANDIT_GOAL) * 100));
+        const pvpPct = Math.min(100, Math.round((pvpCount / PVP_GOAL) * 100));
+        const banditBar = document.getElementById('banditBar');
+        const pvpBar = document.getElementById('pvpBar');
+        banditBar.style.width = banditPct + '%';
+        pvpBar.style.width = pvpPct + '%';
+        if (banditCount >= BANDIT_GOAL) banditBar.classList.add('done');
+        if (pvpCount >= PVP_GOAL) pvpBar.classList.add('done');
+
+        if (banditCount >= BANDIT_GOAL && pvpCount >= PVP_GOAL) {
+            document.getElementById('clanUnlockBtn').classList.remove('hidden');
+            document.getElementById('clanLockedNote').classList.add('hidden');
+            document.getElementById('clanUnlockBtn').onclick = () => {
+                window.location.href = 'clan-assessment.html';
+            };
+            if (userData.clanAssessmentDone) {
+                document.getElementById('clanUnlockBtn').textContent = `📋 Clan Assessment — Retake (Current: ${userData.clanUnitType || '—'})`;
+            }
+        }
+    });
+
+    window.confirmSignOut = function() {
+        if (confirm('Yakin mau sign out?')) {
+            signOut(auth).then(() => { window.location.href = 'login-signup.html'; });
+        }
+    };
+</script>
+
+</body>
+</html>

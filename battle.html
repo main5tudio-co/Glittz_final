@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tactical Grid - Voxel HUD & Battle Report</title>
+    <style>
+        /* =========================================
+           1. GLOBAL & ATMOSPHERE CSS
+           ========================================= */
+        body { margin: 0; overflow: hidden; background: #1a1a2e; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; outline: none; }
+        
+        #atmosphere-layer {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none !important; z-index: 5; transition: background 2s;
+        }
+        .rain-fx { 
+            background: linear-gradient(to bottom, rgba(150,160,170,0) 0%, rgba(100,110,120,0.5) 100%); 
+            animation: rainDrop 0.3s linear infinite;
+        }
+        .night-fx { background: rgba(10, 20, 35, 0.4); }
+        @keyframes rainDrop { 0% { background-position: 0px 0px; } 100% { background-position: 10px 100vh; } }
+
+        /* =========================================
+           2. HUD & UI OVERLAYS
+           ========================================= */
+        #battle-meter-container {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            width: 60%; max-width: 500px; z-index: 20; display: flex; flex-direction: column; align-items: center;
+        }
+        #battle-meter {
+            width: 100%; background: rgba(255, 255, 255, 0.95); border: 1px solid #b0bec5;
+            padding: 6px 12px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: bold; font-size: 13px; color: #333; box-sizing: border-box;
+        }
+        .meter-bar { flex-grow: 1; height: 10px; background: #ddd; margin: 0 10px; border-radius: 4px; overflow: hidden; display: flex; }
+        .meter-fill-enemy { background: #e57373; width: 50%; transition: width 0.4s; }
+        .meter-fill-player { background: #81c784; width: 50%; transition: width 0.4s; }
+        
+        #global-condition {
+            margin-top: 4px; background: rgba(0,0,0,0.8); color: #ffd54f; padding: 4px 12px;
+            border-radius: 12px; font-size: 11px; font-weight: bold; border: 1px solid #ffd54f; box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #weather-compass-group {
+            position: absolute; top: 15px; right: 15px; z-index: 20;
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+        }
+        #weather-icon-center { 
+            width: 50px; height: 50px; background: rgba(255,255,255,0.95);
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border: 2px solid #546e7a; text-shadow: 1px 1px 2px #aaa;
+        }
+        #compass-panel {
+            width: 50px; height: 50px; background: rgba(255,255,255,0.9); border: 2px solid #546e7a; border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; position: relative;
+        }
+        #compass-arrow { position: absolute; font-size: 22px; color: #1e88e5; transform-origin: center; transition: transform 0.1s; text-shadow: 0px 1px 1px #fff; font-weight: bold;}
+        .c-lbl { position: absolute; color: #78909c; font-size: 9px; font-weight: bold; }
+        .c-n { top: 2px; } .c-s { bottom: 2px; } .c-w { left: 4px; } .c-e { right: 4px; }
+
+        #unit-panel {
+            position: absolute; top: 25%; left: 15px; width: 40%; max-width: 220px;
+            background: rgba(255,255,255,0.95); border: 1px solid #b0bec5; 
+            padding: 10px; border-radius: 4px; display: none; z-index: 20;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 12px; color: #333;
+        }
+        #unit-panel h3 { margin: 0 0 6px 0; font-size: 14px; color: #1565c0; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 4px;}
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-weight: bold; }
+
+        #tile-panel {
+            position: absolute; bottom: 15px; right: 15px; text-align: right; font-weight: bold; color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9); font-size: 16px; z-index: 20; pointer-events: none;
+        }
+        .tile-effect { font-size: 12px; font-weight: normal; color: #ffe082; }
+
+        /* =========================================
+           3. FLOATING 3D ELEMENTS
+           ========================================= */
+        .dmg-box { position: absolute; pointer-events: none; z-index: 30; background: #ffe6e6; border: 2px solid #ff4d4d; border-radius: 4px; color: #ff0000; font-weight: bold; font-size: 14px; padding: 2px 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); animation: floatUp 1.5s ease-out forwards; white-space: nowrap; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); } 20% { transform: translate(-50%, -100%) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -250%) scale(1); } }
+        
+        .f-ui { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px;}
+        .f-icon { font-size: 18px; text-shadow: 0 2px 4px rgba(0,0,0,0.9); margin-bottom: 2px; }
+        .f-stats-box { background: rgba(0,0,0,0.65); padding: 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.25); display: flex; flex-direction: column; gap: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.5);}
+        .bar-container { display: flex; align-items: center; gap: 5px; }
+        .stat-num { font-size: 10px; font-weight: bold; width: 26px; text-align: right; color: #fff;}
+        .bar-bg { width: 30px; height: 5px; background: rgba(0,0,0,0.8); border: 1px solid #fff; border-radius:2px; display:flex;} 
+        .bar-hp { height: 100%; background: #00cc44; width: 100%; transition: width 0.3s;}
+        .bar-st { height: 100%; background: #00aaff; width: 100%; transition: width 0.3s;}
+
+        /* Menu & Buttons */
+        .overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(20, 30, 40, 0.95); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        .hidden { display: none !important; }
+        h1 { color: #00ffcc; text-shadow: 2px 2px 0 #000; font-size: 26px; text-transform: uppercase; margin-top:0;} 
+        .draft-box { background: rgba(0,0,0,0.5); border: 2px solid #00ffcc; border-radius: 8px; padding: 20px; text-align: center; width: 100%; max-width: 600px;}
+        .class-btn { background: #222; color: #fff; font-size: 14px; padding: 8px; margin: 4px; border: 2px solid #fff; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #draft-list { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
+        .draft-slot { width: 50px; height: 50px; border: 2px dashed #888; display: flex; align-items: center; justify-content: center; font-size: 24px; border-radius: 8px; background: rgba(255,255,255,0.1);}
+        .btn-start { background: #00ffcc; color: #000; font-size: 18px; font-weight: bold; padding: 12px 35px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;}
+        .btn-start:disabled { background: #555; cursor: not-allowed; } 
+        
+        .pad { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; gap: 10px; }
+        .abtn { padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer; border: 2px solid #fff; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.4);}
+    </style>
+    <script src="js/game.config.js"></script>
+    <script src="js/assets.config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+    <audio id="bgmAmbient" loop preload="none"></audio>
+    <audio id="bgmConflict" loop preload="none"></audio>
+    <audio id="envLoopBed" loop preload="none"></audio>
+
+    <div id="atmosphere-layer"></div>
+
+    <div id="draft-screen" class="overlay">
+        <h1>Vanguard Assembly</h1>
+        <div class="draft-box">
+            <div style="color:#ffb3ba; font-weight:bold; margin-bottom: 20px; font-size:22px; letter-spacing:4px;" id="enemy-draft"></div>
+            <button class="class-btn" style="border-color:#2ea32e" onclick="UI.draftUnit('sword')">⚔️ Sword</button>
+            <button class="class-btn" style="border-color:#d93838" onclick="UI.draftUnit('archer')">🏹 Archer</button>
+            <button class="class-btn" style="border-color:#555555" onclick="UI.draftUnit('horse')">♞ Horse</button>
+            <button class="class-btn" style="border-color:#8b4513" onclick="UI.draftUnit('spear')">⇂ Spear</button>
+            <div id="draft-list">
+                <div class="draft-slot" id="slot-0"></div><div class="draft-slot" id="slot-1"></div>
+                <div class="draft-slot" id="slot-2"></div><div class="draft-slot" id="slot-3"></div>
+            </div>
+            <button id="btn-start" class="btn-start" disabled onclick="UI.onEnterBattle()">ENTER BATTLE</button>
+        </div>
+    </div>
+
+    <div id="battle-meter-container" class="hidden">
+        <div id="battle-meter">
+            <span style="color:#c62828">Bandits</span>
+            <div class="meter-bar"><div class="meter-fill-enemy" id="meter-en"></div><div class="meter-fill-player" id="meter-pl"></div></div>
+            <span style="color:#2e7d32">Comrade</span>
+        </div>
+        <div id="global-condition">🛡️ Vanguard Formation</div>
+    </div>
+
+    <div id="audio-debug-toast" style="display:none; position:fixed; top:60px; left:50%; transform:translateX(-50%);
+         background:rgba(200,0,0,0.92); color:#fff; font-size:11px; font-weight:bold; padding:8px 14px;
+         border-radius:8px; z-index:5000; max-width:90vw; text-align:center; box-shadow:0 4px 10px rgba(0,0,0,0.4);"></div>
+    
+    <div id="weather-compass-group" class="hidden">
+        <div id="weather-icon-center">☀️</div>
+        <div id="compass-panel">
+            <span class="c-lbl c-n">N</span><span class="c-lbl c-s">S</span><span class="c-lbl c-w">W</span><span class="c-lbl c-e">E</span>
+            <div id="compass-arrow">↑</div>
+        </div>
+    </div>
+
+    <div id="unit-panel">
+        <h3 id="ui-type">Unit Type</h3>
+        <div class="stat-row"><span style="color:#2e7d32">HP:</span><span id="ui-hp">1000/1000</span></div>
+        <div class="stat-row"><span style="color:#1565c0">Stamina:</span><span id="ui-st">100</span></div>
+        <div class="stat-row"><span>Move:</span><span id="ui-move">3</span></div>
+        <div style="margin-top:6px; font-style:italic; font-size:10px; color:#666;" id="ui-perk">Perk</div>
+    </div>
+
+    <div id="tile-panel" class="hidden">
+        <div id="ti-type">Plains</div><div class="tile-effect" id="ti-effect">Normal</div>
+    </div>
+
+    <div id="turn-overlay" class="overlay hidden" style="background:rgba(0,0,0,0.8); z-index:100;"><h2>ENEMY IS THINKING...</h2></div>
+    <div id="end-screen" class="overlay hidden" style="z-index:2000; background:rgba(10,14,20,0.92); justify-content:flex-start; align-items:stretch; padding:0;">
+        <div style="width:100%; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 12px; box-sizing:border-box;">
+            <h1 id="end-title" style="text-align:center; margin-bottom:14px;">CONCLUDED</h1>
+            <div id="report-content" style="width:100%; max-width:520px; margin:0 auto; display:flex; flex-direction:column; gap:10px; padding-bottom:30px;"></div>
+        </div>
+    </div>
+    
+    <div id="p-stay" class="pad"><button class="abtn" style="background:#ffcc00; color:#000;" id="b-stay">Face</button></div>
+    <div id="p-conf" class="pad"><button class="abtn" style="background:#00cc44; color:#fff;" id="b-ok">Move</button><button class="abtn" style="background:#ff3333; color:#fff;" id="b-can">Can</button></div>
+    <div id="p-act" class="pad"><button class="abtn" style="background:#ff0055; color:#fff;" id="b-atk">Atk</button><button class="abtn" style="background:#333; color:#fff;" id="b-wat">Wait</button></div>
+    <div id="p-sel" class="pad"><button class="abtn" style="background:#ff3333; color:#fff;" id="b-can-sel">Cancel</button></div>
+
+<script>
+    // ═══════════════════════════════════════════════════════
+    //  CONFIG BRIDGE — semua nilai dari js/game.config.js
+    //  Jangan edit di sini — edit di js/game.config.js
+    // ═══════════════════════════════════════════════════════
+    const CONFIG = {
+        gridX:    GLITZ_CONFIG.battle.gridX,
+        gridZ:    GLITZ_CONFIG.battle.gridZ,
+        tileSize: GLITZ_CONFIG.battle.tileSize,
+        tileGap:  GLITZ_CONFIG.battle.tileGap,
+        walkSpeed:GLITZ_CONFIG.battle.walkSpeed,
+
+        classes: Object.fromEntries(
+            Object.entries(GLITZ_CONFIG.units).map(([key, u]) => [key, {
+                sign:  u.sign,
+                move:  u.move,
+                range: u.range,
+                hp:    u.hp,
+                color: u.color,
+                shape: u.shape,
+                drain: u.stDrain,
+                perk:  u.perk,
+            }])
+        ),
+
+        weathers: [
+            { id: 'Sun',  icon: GLITZ_CONFIG.weather.sun.icon,  cond: 'Bright: High Stamina Drain' },
+            { id: 'Moon', icon: GLITZ_CONFIG.weather.moon.icon, cond: 'Night: Ally Vision Limited to 5' },
+            { id: 'Rain', icon: GLITZ_CONFIG.weather.rain.icon, cond: 'Mud: Move & Vision -1' },
+        ],
+
+        winds: GLITZ_CONFIG.winds,
+    };
+
+    const STATE = {
+        phase: 'START', units: [], mapData: [], activeUnit: null, pendingTile: null, validTargets: [], turnCount: 0,
+        hlGroup: new THREE.Group(), faceGroup: new THREE.Group(), tgtGroup: new THREE.Group(), clock: new THREE.Clock(),
+        weather: null, wind: null, hitTiles: [], // NEW: Dedicated array just for strict tile raycasting
+        conflictStarted: false
+    };
+
+    // ═══════════════════════════════════════════════════════
+    //  PVP LAYER
+    //  Everything below with PVP.* / PvpFlow.* is additive —
+    //  when PVP.active is false (normal bandit mode, no ?mode=
+    //  pvp&match=... in the URL), none of this runs and the
+    //  original single-player flow is 100% unchanged.
+    //
+    //  PVP.myRole: 'host' | 'guest' — set from URL, matches the
+    //  role MatchSync was given when the room was created/joined
+    //  on the lobby screen. Two lobby paths feed this URL:
+    //    - pvplocaltest.html: no internet needed, connects over a
+    //      plain WebSocket to a relay running on one phone via
+    //      Termux (see pvp-local-server.mjs) — for testing two
+    //      phones over Bluetooth tethering / same Wi-Fi before
+    //      the real online lobby exists.
+    //    - (future) online lobby: Firestore via match.sync.js.
+    //
+    //  Locally, "my" units always render as tm:'player' (bottom,
+    //  green) and the opponent's as tm:'enemy' (top, red) — same
+    //  as bandit mode, just mapped per-viewer instead of fixed.
+    // ═══════════════════════════════════════════════════════
+    const PVP = {
+        active: false, local: false, wsHost: null, matchId: null, myRole: null, turnTeam: null,
+        battleStarted: false, _spawnSent: false, _resultSent: false,
+    };
+    (function initPvpFromURL() {
+        const p = new URLSearchParams(window.location.search);
+        if (p.get('mode') === 'pvp' && p.get('match') && p.get('role')) {
+            PVP.active = true;
+            PVP.matchId = p.get('match');
+            PVP.myRole = p.get('role'); // 'host' | 'guest'
+            PVP.local = p.get('local') === '1';
+            PVP.wsHost = p.get('wsHost'); // e.g. "192.168.44.1:8787" — only used when PVP.local
+        }
+    })();
+
+    // ═══════════════════════════════════════════════════════
+    //  UNIT MODEL LOADER
+    //  Loads the real .gltf models from UNIT_MODELS (assets.config.js)
+    //  to replace the prototype box shapes. Cached per-type so 4
+    //  units of the same class don't re-fetch the file 4x.
+    //
+    //  TARGET_SCALE — bounding-box height (in world units) each
+    //  model gets normalized to, so proportions stay sane on the
+    //  grid regardless of how big/small the model was exported.
+    //  Pulled from GLITZ_CONFIG.units[type].scale[1] (the Y value)
+    //  since that field was already set aside for this in
+    //  game.config.js. Tweak per-unit there if a model looks off.
+    //
+    //  HEIGHT_MULTIPLIER — bumps model presence 2x taller than the
+    //  raw scale.y value, per revision request (units felt too
+    //  small/flat on the grid).
+    //
+    //  MAX_WIDTH_MARGIN — the widest horizontal part of a model
+    //  (arms, weapon, etc.) must stay this fraction of a tile's
+    //  width away from the tile edge, so nothing overhangs onto
+    //  the neighboring tile. 1/6 margin each side = 2/3 max width.
+    // ═══════════════════════════════════════════════════════
+    const gltfLoader = (typeof THREE.GLTFLoader === 'function') ? new THREE.GLTFLoader() : null;
+    const _modelCache = {}; // type -> loaded THREE.Group (source, cloned per spawn)
+    const MODEL_FACING_OFFSET = { sword: 0, archer: 0, horse: 0, spear: 0 };
+    const HEIGHT_MULTIPLIER = 2;
+    const MAX_WIDTH_MARGIN = 1/6; // margin per side; max width = tileSize * (1 - 2*margin)
+
+    function getTargetHeight(type) {
+        const s = GLITZ_CONFIG.units[type] && GLITZ_CONFIG.units[type].scale;
+        const base = (s && s[1]) ? s[1] : 0.6; // fallback height if scale missing
+        return base * HEIGHT_MULTIPLIER;
+    }
+
+    // Uniformly scales `model` to targetH, then clamps down further if
+    // its horizontal footprint would overhang past MAX_WIDTH_MARGIN of
+    // the tile. Recenters the model on X/Z (fixes models whose authored
+    // pivot isn't centered — e.g. archer/horse drifting off-tile) and
+    // finally sits its lowest point at y=0 (tile surface).
+    function fitModelToTile(model, targetH, maxWidth) {
+        const box = new THREE.Box3().setFromObject(model);
+        const size = new THREE.Vector3(); box.getSize(size);
+        let s = (size.y > 0.0001) ? targetH / size.y : 1;
+        const horiz = Math.max(size.x, size.z) * s;
+        if (maxWidth && horiz > maxWidth) { s *= maxWidth / horiz; }
+        model.scale.setScalar(s);
+        const box2 = new THREE.Box3().setFromObject(model);
+        const center2 = new THREE.Vector3(); box2.getCenter(center2);
+        model.position.x -= center2.x;
+        model.position.z -= center2.z;
+        model.position.y -= box2.min.y;
+    }
+
+    // Converts a unit's class color to a pale/pastel tone for the
+    // figure-ground platform — same treatment for both teams now,
+    // so every unit gets a colored plate like the archer's rather
+    // than enemy units getting a flat grey/white block.
+    function pastelizeForTeam(team, classColorHex) {
+        const c = new THREE.Color(classColorHex);
+        const hsl = {}; c.getHSL(hsl);
+        c.setHSL(hsl.h, hsl.s * 0.5, Math.min(0.82, hsl.l + 0.35));
+        return c;
+    }
+
+    // Loads (or reuses cached) GLTF for `type`, clones it into `group`,
+    // fits/positions it, and removes the placeholder box + edges on
+    // success. On failure, the placeholder stays visible and a red
+    // debug toast shows the failed path (same pattern as BGM errors).
+    function loadUnitModel(type, group, placeholderMesh, placeholderEdges) {
+        const path = (typeof UNIT_MODELS !== 'undefined') ? UNIT_MODELS[type] : null;
+        if (!path || !gltfLoader) return; // no path configured or loader script missing — keep box
+
+        const attach = (source) => {
+            const model = source.clone(true);
+            const maxWidth = CONFIG.tileSize * (1 - 2 * MAX_WIDTH_MARGIN);
+            fitModelToTile(model, getTargetHeight(type), maxWidth);
+            model.rotation.y += (MODEL_FACING_OFFSET[type] || 0);
+            group.add(model);
+            if (placeholderMesh) group.remove(placeholderMesh);
+            if (placeholderEdges && placeholderEdges.parent) placeholderEdges.parent.remove(placeholderEdges);
+        };
+
+        if (_modelCache[type]) { attach(_modelCache[type]); return; }
+
+        gltfLoader.load(
+            path,
+            (gltf) => { _modelCache[type] = gltf.scene; attach(gltf.scene); },
+            undefined,
+            (err) => { showAudioDebug('MODEL FAILED: ' + path); }
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  BGM CONTROLLER
+    //  Ambient (weather) loops from battle start.
+    //  Crossfades into "conflict" track on first attack.
+    //  near-victory / tough-fight phases: TODO, files belum ada
+    //  di asset/bgm/ — tinggal tambah key + call di sini nanti.
+    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════
+    //  DEBUG TOAST — visible on-screen, no desktop console needed.
+    //  Shows the actual file path that failed, so you can see
+    //  it's a 404 / wrong path issue right on your phone.
+    //  Remove this whole block once audio is confirmed working.
+    // ═══════════════════════════════════════════════════════
+    let _audioDebugTimer = null;
+    function showAudioDebug(msg) {
+        const el = document.getElementById('audio-debug-toast');
+        if (!el) return;
+        el.innerText = msg;
+        el.style.display = 'block';
+        clearTimeout(_audioDebugTimer);
+        _audioDebugTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    const BGM = {
+        ambientEl: null, conflictEl: null, fadeTimer: null,
+
+        init: function() {
+            this.ambientEl = document.getElementById('bgmAmbient');
+            this.conflictEl = document.getElementById('bgmConflict');
+            this.ambientEl.addEventListener('error', () => showAudioDebug('BGM AMBIENT FAILED: ' + this.ambientEl.src));
+            this.conflictEl.addEventListener('error', () => showAudioDebug('BGM CONFLICT FAILED: ' + this.conflictEl.src));
+        },
+
+        fade: function(el, from, to, ms, onDone) {
+            clearInterval(this.fadeTimer);
+            const steps = 20, stepMs = ms / steps, delta = (to - from) / steps;
+            let i = 0; el.volume = from;
+            this.fadeTimer = setInterval(() => {
+                i++; el.volume = Math.max(0, Math.min(1, from + delta * i));
+                if (i >= steps) { clearInterval(this.fadeTimer); if (onDone) onDone(); }
+            }, stepMs);
+        },
+
+        // Called once battle starts — picks ambient track matching the
+        // weather that actually rolled (Sun/Moon/Rain), not one fixed slot.
+        // Silent (no play) if that weather's track isn't recorded yet.
+        playAmbient: function() {
+            if (!this.ambientEl) return;
+            const key = 'weather' + STATE.weather.id; // e.g. 'weatherSun', 'weatherRain'
+            const src = BGM_TRACKS[key];
+            if (!src) { showAudioDebug('No ambient BGM yet for ' + STATE.weather.id + ' — add ' + key + ' in assets.config.js'); return; }
+            showAudioDebug('Loading BGM: ' + src);
+            this.ambientEl.src = src;
+            this.ambientEl.volume = 0;
+            this.ambientEl.play().catch(err => showAudioDebug('BGM AMBIENT play() blocked: ' + err.message));
+            this.fade(this.ambientEl, 0, 0.5, 1500);
+        },
+
+        // Called on first executeAttack() — crossfade ambient -> conflict.
+        triggerConflict: function() {
+            if (!this.conflictEl || !BGM_TRACKS.firstConflict) return;
+            this.conflictEl.src = BGM_TRACKS.firstConflict;
+            this.conflictEl.volume = 0;
+            this.conflictEl.play().catch(() => {});
+            this.fade(this.conflictEl, 0, 0.5, 2000);
+            this.fade(this.ambientEl, this.ambientEl.volume, 0, 2000, () => this.ambientEl.pause());
+        },
+
+        stopAll: function() {
+            clearInterval(this.fadeTimer);
+            if (this.ambientEl) this.ambientEl.pause();
+            if (this.conflictEl) this.conflictEl.pause();
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════
+    //  SFX CONTROLLER
+    //  Per-unit combat sounds (attack/hit/special) + weather
+    //  environment ambience (loop bed + random one-shots).
+    //  Semua no-op aman kalau file belum ada (resolveUnitSound
+    //  / AMBIENCE return null) — nggak akan error.
+    // ═══════════════════════════════════════════════════════
+    const SFX = {
+        envBedEl: null, oneShotTimer: null,
+
+        init: function() {
+            this.envBedEl = document.getElementById('envLoopBed');
+        },
+
+        // Fire a one-shot combat sound for a unit. category: attack/hit/special/critical/lose
+        playUnit: function(unit, category) {
+            const src = resolveUnitSound(unit.type, category);
+            if (!src) return; // TODO file belum ada — silent, bukan error
+            const a = new Audio(src);
+            a.volume = 0.7;
+            a.play().catch(() => {});
+        },
+
+        // Weather ambience — call once when battle starts, matches STATE.weather.id
+        startAmbience: function(weatherId) {
+            const cfg = AMBIENCE[weatherId];
+            if (!cfg) return;
+            if (cfg.loopBed && this.envBedEl) {
+                this.envBedEl.src = cfg.loopBed;
+                this.envBedEl.volume = 0.25; // sits under BGM
+                this.envBedEl.play().catch(() => {});
+            }
+            this.scheduleOneShot(cfg.oneShots);
+        },
+
+        scheduleOneShot: function(pool) {
+            clearTimeout(this.oneShotTimer);
+            if (!pool || pool.length === 0) return; // TODO belum ada file — skip scheduling
+            const delay = 8000 + Math.random() * 12000; // every 8–20s
+            this.oneShotTimer = setTimeout(() => {
+                const file = pool[Math.floor(Math.random() * pool.length)];
+                const a = new Audio(file);
+                a.volume = 0.4;
+                a.play().catch(() => {});
+                this.scheduleOneShot(pool); // reschedule next one-shot
+            }, delay);
+        },
+
+        stopAmbience: function() {
+            clearTimeout(this.oneShotTimer);
+            if (this.envBedEl) this.envBedEl.pause();
+        }
+    };
+
+    const UI = {
+        playerDraft: [], enemyDraft: [],
+        initDraft: function() {
+            STATE.weather = CONFIG.weathers[Math.floor(Math.random() * CONFIG.weathers.length)];
+            STATE.wind = CONFIG.winds[Math.floor(Math.random() * CONFIG.winds.length)];
+            
+            document.getElementById('weather-icon-center').innerText = STATE.weather.icon;
+            document.getElementById('global-condition').innerText = `${STATE.weather.icon} ${STATE.weather.cond}`;
+            
+            const atmo = document.getElementById('atmosphere-layer');
+            if(STATE.weather.id === 'Rain') { atmo.className = 'rain-fx'; }
+            else if(STATE.weather.id === 'Moon') { atmo.className = 'night-fx'; }
+            else { atmo.className = ''; }
+
+            const keys = Object.keys(CONFIG.classes);
+            for(let i=0; i<4; i++) { this.enemyDraft.push(keys[Math.floor(Math.random() * keys.length)]); }
+            document.getElementById('enemy-draft').innerText = this.enemyDraft.map(k => CONFIG.classes[k].sign).join("  ");
+        },
+        draftUnit: function(type) {
+            if(this.playerDraft.length < 4) {
+                const cls = CONFIG.classes[type];
+                let slot = document.getElementById(`slot-${this.playerDraft.length}`);
+                slot.innerText = cls.sign; slot.style.borderColor = '#' + cls.color.toString(16).padStart(6, '0'); slot.style.background = "rgba(255,255,255,0.2)";
+                this.playerDraft.push(type);
+                if(this.playerDraft.length === 4) document.getElementById('btn-start').disabled = false;
+            }
+        },
+        // Bandit mode: enter battle immediately (existing behavior).
+        // Pvp mode: lock draft to Firestore and wait for the opponent —
+        // ENGINE.startBattle() itself never runs in pvp; PvpFlow.applySpawn
+        // does the spawning once both sides are locked.
+        onEnterBattle: function() {
+            if (PVP.active) { PvpFlow.lockAndWait(); } else { ENGINE.startBattle(); }
+        },
+        updateMeter: function() {
+            let pHP = 0, pMax = 0, eHP = 0, eMax = 0;
+            STATE.units.forEach(u => {
+                if(u.tm === 'player' && u.hp > 0) { pHP += u.hp; pMax += u.mHp; } 
+                else if(u.tm === 'enemy' && u.hp > 0) { eHP += u.hp; eMax += u.mHp; }
+            });
+            let pPct = pMax > 0 ? (pHP / (pHP + eHP)) * 100 : 50;
+            document.getElementById('meter-pl').style.width = `${pPct}%`;
+            document.getElementById('meter-en').style.width = `${100 - pPct}%`;
+        },
+        showUnitPanel: function(u) {
+            const panel = document.getElementById('unit-panel');
+            if(!u) { panel.style.display = 'none'; return; }
+            panel.style.display = 'block';
+            let cls = CONFIG.classes[u.type];
+            document.getElementById('ui-type').innerText = `${u.tm.toUpperCase()} ${cls.sign}`;
+            document.getElementById('ui-hp').innerText = `${u.hp} / ${u.mHp}`;
+            document.getElementById('ui-hp').style.color = (u.hp/u.mHp <= 0.1) ? '#b0bec5' : '#2e7d32';
+            document.getElementById('ui-st').innerText = `${u.st}%`;
+            document.getElementById('ui-move').innerText = COMBAT.calcMove(u);
+            document.getElementById('ui-perk').innerText = cls.perk;
+        },
+        setPad: function(id, isVisible) { document.getElementById(id).style.display = isVisible ? 'flex' : 'none'; },
+        toScreenPosition: function(vec3) {
+            let v = vec3.clone(); v.project(ENGINE.camera);
+            return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: -(v.y * 0.5 - 0.5) * window.innerHeight };
+        },
+        spawnDamageBox: function(unit, amount, prefix="") {
+            let dt = document.createElement('div'); dt.className = 'dmg-box'; dt.innerText = `${prefix}${amount}`; document.body.appendChild(dt);
+            let pos = this.toScreenPosition(unit.m.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+            dt.style.left = `${pos.x}px`; dt.style.top = `${pos.y}px`;
+            setTimeout(() => { if(dt.parentNode) dt.parentNode.removeChild(dt); }, 1500);
+        }
+    };
+
+    const COMBAT = {
+        calcMove: function(u) {
+            let mv = CONFIG.classes[u.type].move;
+            if(STATE.weather.id === 'Rain' && u.type !== 'spear') mv = Math.max(1, mv - 1);
+            return mv;
+        },
+        recoverStamina: function(u) {
+            u.st = Math.min(100, u.st + 15);
+            document.getElementById(`st-txt-${u.id}`).innerText = u.st;
+            document.getElementById(`s-${u.id}`).style.width = `${u.st}%`;
+        },
+        updateVision: function() {
+            if(STATE.weather.id === 'Sun') {
+                STATE.units.forEach(u => { if(u.hp > 0) {u.m.visible = true; u.ui.style.display = 'flex';} }); return; 
+            }
+            let maxSight = STATE.weather.id === 'Rain' ? 4 : 5;
+            
+            STATE.units.forEach(e => {
+                if(e.tm === 'enemy' && e.hp > 0) {
+                    let isVisible = false;
+                    STATE.units.forEach(p => {
+                        if(p.tm === 'player' && p.hp > 0) {
+                            let dist = Math.abs(p.x - e.x) + Math.abs(p.z - e.z);
+                            if(dist <= maxSight) isVisible = true;
+                        }
+                    });
+                    e.m.visible = isVisible;
+                    e.ui.style.display = isVisible ? 'flex' : 'none';
+                }
+            });
+        },
+        getReachable: function(u) { 
+            let maxSteps = Math.min(this.calcMove(u), Math.floor(u.st / 5)); 
+            let q=[{x:u.x, z:u.z, d:0}], v=Array(CONFIG.gridX).fill(0).map(()=>Array(CONFIG.gridZ).fill(0)), r=[]; v[u.x][u.z]=1;
+            while(q.length) { 
+                let c=q.shift(); r.push(c); 
+                if(c.d < maxSteps) {
+                    [{x:0,z:-1},{x:0,z:1},{x:-1,z:0},{x:1,z:0}].forEach(dir => { 
+                        let nx=c.x+dir.x, nz=c.z+dir.z; 
+                        if(nx>=0 && nx<CONFIG.gridX && nz>=0 && nz<CONFIG.gridZ && !v[nx][nz] && (!STATE.mapData[nx][nz].userData.occ || (nx==u.x && nz==u.z))) { v[nx][nz]=1; q.push({x:nx, z:nz, d:c.d+1}); }
+                    }); 
+                } 
+            } return r; 
+        },
+        getPath: function(sx,sz,ex,ez) { 
+            let o=[{x:sx,z:sz,g:0,f:0,p:null}], c=[];
+            while(o.length) { 
+                o.sort((a,b)=>a.f-b.f); let cur=o.shift(); 
+                if(cur.x==ex && cur.z==ez) { let p=[]; while(cur.p){p.unshift({x:cur.x,z:cur.z}); cur=cur.p;} return p;} 
+                c.push(cur);
+                [{x:0,z:-1},{x:0,z:1},{x:-1,z:0},{x:1,z:0}].forEach(d => { 
+                    let nx=cur.x+d.x, nz=cur.z+d.z; 
+                    if(nx>=0 && nx<CONFIG.gridX && nz>=0 && nz<CONFIG.gridZ && (!STATE.mapData[nx][nz].userData.occ || (nx==ex&&nz==ez)) && !c.find(n=>n.x==nx&&n.z==nz)) { 
+                        let g=cur.g+1, f=g+Math.abs(nx-ex)+Math.abs(nz-ez), nb=o.find(n=>n.x==nx&&n.z==nz); 
+                        if(!nb) o.push({x:nx,z:nz,g,f,p:cur}); else if(g<nb.g){nb.g=g;nb.f=f;nb.p=cur;} 
+                    }
+                }); 
+            } return []; 
+        },
+        getValidTargets: function(u) {
+            let targets = []; let ry = u.m.rotation.y; let dx=0, dz=0; 
+            let pi = Math.PI; let nRy = ry % (2*pi); if (nRy < -0.1) nRy += 2*pi;
+            if (Math.abs(nRy) < 0.1) dz = -1; else if (Math.abs(nRy - pi) < 0.1) dz = 1; else if (Math.abs(nRy - pi/2) < 0.1) dx = -1; else dx = 1;
+
+            if (u.type === 'archer') {
+                for(let d=1; d<=CONFIG.classes.archer.range; d++) {
+                    for(let w = -d+1; w <= d-1; w++) {
+                        let tx = u.x + (dx === 0 ? w : dx*d); let tz = u.z + (dz === 0 ? w : dz*d);
+                        if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ) {
+                            let occ = STATE.mapData[tx][tz].userData.occ; if(occ && occ.tm !== u.tm && occ.hp > 0) targets.push(occ);
+                        }
+                    }
+                }
+            } else {
+                let tx = u.x + dx, tz = u.z + dz;
+                if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ) { let occ = STATE.mapData[tx][tz].userData.occ; if(occ && occ.tm !== u.tm && occ.hp > 0) targets.push(occ); }
+            }
+            return targets;
+        },
+        applyDamage: function(u, amt, prefix="") {
+            u.hp = Math.max(0, u.hp - amt); 
+            document.getElementById(`hp-txt-${u.id}`).innerText = u.hp; document.getElementById(`h-${u.id}`).style.width = `${(u.hp/u.mHp)*100}%`;
+            UI.spawnDamageBox(u, amt, prefix); UI.updateMeter();
+            if (amt > 0) SFX.playUnit(u, u.hp <= 0 ? 'lose' : 'hit');
+
+            let hpPct = u.hp / u.mHp;
+            let scaleSides = Math.max(0.3, hpPct);
+            u.m.scale.set(scaleSides, 1, scaleSides);
+            
+            if(hpPct <= 0.10 && u.m.children[0]) { u.m.children[0].material.color.setHex(0xb0bec5); }
+
+            if(u.hp <= 0) { setTimeout(() => { ENGINE.scene.remove(u.m); STATE.mapData[u.x][u.z].userData.occ = null; u.ui.style.display = 'none'; this.checkBattleEnd(); }, 500); }
+        },
+        applySpecialEffects: function(atk, def, effect) {
+            if (def.hp <= 0) return;
+            SFX.playUnit(atk, 'special');
+            if (effect === 'turn') { setTimeout(() => { def.m.lookAt(atk.m.position.x, def.m.position.y, atk.m.position.z); UI.spawnDamageBox(def, "TURNED!", ""); }, 400); } 
+            else if (effect === 'push' || effect === 'run') {
+                let pdx = Math.sign(def.x - atk.x); let pdz = Math.sign(def.z - atk.z); let tx = def.x + pdx; let tz = def.z + pdz;
+                if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ && !STATE.mapData[tx][tz].userData.occ) {
+                    setTimeout(() => {
+                        STATE.mapData[def.x][def.z].userData.occ = null; def.x = tx; def.z = tz; STATE.mapData[tx][tz].userData.occ = def;
+                        let tgtPos = ENGINE.getTilePos(tx, tz); tgtPos.y = def.m.position.y; def.m.position.copy(tgtPos);
+                        UI.spawnDamageBox(def, effect==='push'?"PUSHED!":"RAN!", "");
+                    }, 400);
+                }
+            }
+        },
+        executeAttack: function(atk, def) {
+            if (!STATE.conflictStarted) { STATE.conflictStarted = true; BGM.triggerConflict(); }
+            SFX.playUnit(atk, 'attack');
+            let baseDmg = 100 * (0.9 + Math.random() * 0.2); let finalDmg = baseDmg; let prefix = ""; let specialEffect = null;
+            let aa = Math.atan2(atk.x - def.x, atk.z - def.z); let da = def.m.rotation.y; 
+            let df = Math.abs(aa - da); while(df > Math.PI) df -= 2*Math.PI; df = Math.abs(df); 
+
+            if (atk.type === 'archer') { 
+                let dist = Math.abs(atk.x - def.x) + Math.abs(atk.z - def.z);
+                let accuracy = 100 - ((dist - 1) * 15); 
+                if (Math.random() * 100 > accuracy) { finalDmg = 0; prefix = "MISS! "; } else { prefix = "HIT! "; } 
+                
+                if(STATE.weather.id === 'Rain') finalDmg *= 0.8;
+                let ax = def.x - atk.x, az = def.z - atk.z;
+                let len = Math.sqrt(ax*ax + az*az); if(len>0){ax/=len; az/=len;}
+                
+                let dot = (ax * STATE.wind.vec.x) + (az * STATE.wind.vec.z);
+                if(dot > 0.5) { finalDmg *= 1.3; prefix += "TAILWIND! "; }
+                else if(dot < -0.5) { finalDmg *= 0.7; prefix += "HEADWIND! "; }
+                else { finalDmg *= 0.9; }
+
+            } else {
+                if (df > 2.3) { finalDmg *= 1.30; prefix = "BACK! "; if (Math.random() < 0.20) specialEffect = 'turn'; } 
+                else if (df > 0.7) { finalDmg *= 1.10; prefix = "SIDE! "; if (Math.random() < 0.30 && atk.type === 'horse') specialEffect = 'run'; }
+            }
+            
+            if (atk.type === 'spear' && def.type === 'horse') { specialEffect = 'push'; prefix = "BRACE! "; finalDmg *= 1.2; }
+
+            finalDmg = Math.round(finalDmg);
+            let recoilDmg = 0;
+            if (finalDmg > 0) {
+                atk.dmgDealt += finalDmg; this.applyDamage(def, finalDmg, prefix);
+                if (specialEffect) this.applySpecialEffects(atk, def, specialEffect);
+                recoilDmg = Math.round(finalDmg * (0.07 + Math.random() * 0.08));
+                setTimeout(() => { if(atk.hp > 0) this.applyDamage(atk, recoilDmg, "RECOIL "); }, 800);
+            } else { UI.spawnDamageBox(def, "0", prefix); }
+
+            let drain = CONFIG.classes[atk.type].drain;
+            if(STATE.weather.id === 'Sun') drain += 15;
+            atk.st = Math.max(0, atk.st - drain);
+            document.getElementById(`st-txt-${atk.id}`).innerText = atk.st; document.getElementById(`s-${atk.id}`).style.width = `${atk.st}%`;
+            UI.showUnitPanel(atk);
+
+            // Resolved values, for PVP to broadcast — attacker computed the
+            // RNG, the opponent's client just replays these exact numbers.
+            return { finalDmg, prefix, specialEffect, recoilDmg };
+        },
+        checkBattleEnd: function() {
+            let pAlive = STATE.units.filter(u => u.tm === 'player' && u.hp > 0).length;
+            let eAlive = STATE.units.filter(u => u.tm === 'enemy' && u.hp > 0).length;
+
+            if(pAlive === 0 || eAlive === 0) {
+                STATE.phase = 'END';
+                document.getElementById('turn-overlay').classList.add('hidden');
+                document.getElementById('weather-compass-group').classList.add('hidden');
+
+                const isWin = pAlive > 0;
+
+                if (PVP.active) { PvpFlow.showEndScreen(isWin); return; }
+
+                // ── collect stats ──────────────────────────────────────────
+                const playerUnits = STATE.units.filter(u => u.tm === 'player');
+                const enemyUnits  = STATE.units.filter(u => u.tm === 'enemy');
+                let pTotalDmg = 0, eTotalDmg = 0, pKills = 0;
+                playerUnits.forEach(u => pTotalDmg += u.dmgDealt);
+                enemyUnits.forEach(u => { eTotalDmg += u.dmgDealt; if(u.hp <= 0) pKills++; });
+
+                // best player unit by dmg
+                const bestPlayerUnit = [...playerUnits].sort((a,b) => b.dmgDealt - a.dmgDealt)[0];
+                const unitDesc = {
+                    sword:  { why: 'Balanced front-liner. High HP absorbs punishment while holding the line.' },
+                    archer: { why: 'Range pressure unit. Applies damage from safety before melee closes.' },
+                    horse:  { why: 'Fastest flanker. Caught enemies off-guard with wide sweeping approaches.' },
+                    spear:  { why: 'Anti-cavalry anchor. Controlled spacing and punished charge attempts.' }
+                };
+
+                // bandit formation analysis
+                const eCounts = {};
+                enemyUnits.forEach(u => { eCounts[u.type] = (eCounts[u.type]||0)+1; });
+                const dominantEnemy = Object.entries(eCounts).sort((a,b)=>b[1]-a[1])[0][0];
+                const formationTitles = {
+                    sword:  'Iron Wall', archer: 'Storm Volley', horse: 'Blitz Surge', spear: 'Phalanx Press'
+                };
+                const formationDesc = {
+                    sword:  'Heavy infantry block. Designed to grind attrition until your stamina collapses.',
+                    archer: 'Ranged suppression. Aims to drain HP from range before you can close distance.',
+                    horse:  'Speed-rush formation. Tries to overwhelm your flanks before you can regroup.',
+                    spear:  'Defensive wall. Baits your cavalry and punishes aggression with counter-range.'
+                };
+
+                // AI difficulty read (based on turns taken and player losses)
+                const pLosses = playerUnits.filter(u => u.hp <= 0).length;
+                let aiLevel, aiTitle;
+                if (STATE.turnCount <= 4 && pLosses === 0)        { aiLevel = 'Light';   aiTitle = 'Reckless Charge'; }
+                else if (STATE.turnCount <= 7 && pLosses <= 1)    { aiLevel = 'Medium';  aiTitle = 'Steady Advance'; }
+                else if (pLosses >= 2 && eTotalDmg > pTotalDmg)  { aiLevel = 'Legend';  aiTitle = 'Tactical Mastery'; }
+                else                                               { aiLevel = 'Smart';   aiTitle = 'Calculated Push'; }
+
+                // bandit aim analysis (what they targeted)
+                const mostAttacked = [...playerUnits].sort((a,b) => (b.mHp - b.hp) - (a.mHp - a.hp))[0];
+                const aiAim = mostAttacked
+                    ? `Focused fire on your ${mostAttacked.type} — targeting your ${mostAttacked.type === 'archer' ? 'ranged threat' : mostAttacked.type === 'horse' ? 'mobility' : 'frontline anchor'}.`
+                    : 'Spread pressure across your formation with no clear priority.';
+
+                // bandit leader farewell
+                const margin = pTotalDmg > 0 ? Math.round((pTotalDmg - eTotalDmg) / Math.max(pTotalDmg, eTotalDmg) * 100) : 0;
+                const closeMatch = Math.abs(margin) < 20;
+
+                const winFarewells = [
+                    `"${closeMatch ? 'Lucky draw, commander. Next time the ground bleeds different.' : 'You fought well. My lands remain mine — come if you dare.'}"`,
+                    `"${closeMatch ? 'Almost had you there. Almost.' : 'My territories stand. I will be watching the horizon.'}"`,
+                    `"${closeMatch ? 'Do not mistake survival for strength.' : 'The battle ends here. My ground, my rule.'}"`,
+                    `"${closeMatch ? 'A coin flip. I have seen worse.' : 'You hold today. Tomorrow belongs to me.'}"`,
+                ];
+                const loseFarewells = [
+                    `"${closeMatch ? 'You barely made it. I will be waiting.' : 'We are done here. Regroup and think again.'}"`,
+                    `"${closeMatch ? 'A narrow road you walked. I will widen it next time.' : 'Retreat is not failure. It is patience.'}"`,
+                    `"${closeMatch ? 'Closer than I expected from you.' : 'This formation fails. I will bring another.'}"`,
+                    `"${closeMatch ? 'Count your breath. I count my steps back.' : 'You win a skirmish. The war has many roads.'}"`,
+                ];
+                const farewellPool = isWin ? winFarewells : loseFarewells;
+                const farewell = farewellPool[Math.floor(Math.random() * farewellPool.length)];
+
+                // ── card style ────────────────────────────────────────────
+                const card = (title, body) => `
+                    <div style="background:rgba(255,255,255,0.93); border-radius:10px; border:1.5px solid #ddd;
+                                padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                        <div style="font-size:10px; font-weight:700; letter-spacing:1.5px; color:#888;
+                                    text-transform:uppercase; margin-bottom:8px;">${title}</div>
+                        ${body}
+                    </div>`;
+
+                const unitColor = { sword:'#1565c0', archer:'#6a1b9a', horse:'#1b5e20', spear:'#bf360c' };
+
+                // ── UNIT LISTING ──────────────────────────────────────────
+                let unitRows = '';
+                const allUnits = [...playerUnits, ...enemyUnits];
+                allUnits.forEach(u => {
+                    const alive = u.hp > 0;
+                    const isBandit = u.tm === 'enemy';
+                    const nameColor = isBandit ? '#000' : (unitColor[u.type] || '#333');
+                    const nameFw = isBandit ? '800' : '700';
+                    const hpPct = Math.round((u.hp / u.mHp) * 100);
+                    const hpBarColor = hpPct > 50 ? '#4caf50' : hpPct > 20 ? '#ff9800' : '#f44336';
+                    const rowBg = alive ? '#fff' : 'rgba(0,0,0,0.04)';
+                    const opacity = alive ? '1' : '0.45';
+                    unitRows += `
+                        <div style="display:flex; align-items:center; gap:8px; padding:7px 8px;
+                                    background:${rowBg}; border:1.5px solid #e0e0e0; border-radius:7px;
+                                    opacity:${opacity}; margin-bottom:5px;">
+                            <div style="width:34px; height:34px; border:2px solid ${nameColor}; border-radius:6px;
+                                        display:flex; align-items:center; justify-content:center;
+                                        font-size:18px; background:#f8f8f8; flex-shrink:0;">
+                                ${CONFIG.classes[u.type].sign}
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-weight:${nameFw}; color:${nameColor}; font-size:12px; text-transform:uppercase; letter-spacing:.5px;">
+                                    ${isBandit ? '☠ Bandit' : '⚔ Comrade'} · ${u.type}
+                                </div>
+                                <div style="margin-top:3px; height:5px; background:#eee; border-radius:3px; overflow:hidden;">
+                                    <div style="width:${hpPct}%; height:100%; background:${hpBarColor}; border-radius:3px; transition:width .4s;"></div>
+                                </div>
+                            </div>
+                            <div style="text-align:right; flex-shrink:0;">
+                                <div style="font-size:11px; font-weight:700; color:#333;">${u.dmgDealt} dmg</div>
+                                <div style="font-size:9px; color:#999; margin-top:1px;">${alive ? u.hp + ' hp left' : 'fallen'}</div>
+                            </div>
+                        </div>`;
+                });
+
+                // ── BEST UNIT ─────────────────────────────────────────────
+                const bestCard = bestPlayerUnit ? card('⭐ Today\'s Best Unit', `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="font-size:28px; width:42px; height:42px; border:2px solid ${unitColor[bestPlayerUnit.type]||'#333'};
+                                    border-radius:8px; display:flex; align-items:center; justify-content:center; background:#f5f5f5;">
+                            ${CONFIG.classes[bestPlayerUnit.type].sign}
+                        </div>
+                        <div>
+                            <div style="font-weight:800; font-size:13px; color:${unitColor[bestPlayerUnit.type]||'#333'}; text-transform:uppercase;">
+                                ${bestPlayerUnit.type}
+                            </div>
+                            <div style="font-size:11px; color:#555; margin-top:3px; line-height:1.4;">
+                                ${unitDesc[bestPlayerUnit.type]?.why || ''}
+                            </div>
+                        </div>
+                    </div>`) : '';
+
+                // ── BANDIT REPORT ─────────────────────────────────────────
+                const banditCard = card('☠ Bandit Intel', `
+                    <div style="display:flex; flex-direction:column; gap:6px; font-size:11px; color:#333; line-height:1.5;">
+                        <div><span style="font-weight:700; color:#000;">Main Power:</span>
+                            ${CONFIG.classes[dominantEnemy].sign} ${dominantEnemy} — ${eCounts[dominantEnemy]} unit${eCounts[dominantEnemy]>1?'s':''}</div>
+                        <div><span style="font-weight:700; color:#000;">Formation:</span>
+                            <span style="color:#b71c1c; font-weight:700;">${formationTitles[dominantEnemy]}</span> —
+                            ${formationDesc[dominantEnemy]}</div>
+                        <div><span style="font-weight:700; color:#000;">Against You:</span>
+                            ${aiAim}</div>
+                        <div><span style="font-weight:700; color:#000;">AI Behavior:</span>
+                            <span style="color:#1565c0; font-weight:700;">${aiLevel} · ${aiTitle}</span></div>
+                        <div style="margin-top:4px; padding:8px 10px; background:rgba(0,0,0,0.04);
+                                    border-left:3px solid #333; border-radius:4px; font-style:italic;">
+                            ${farewell}
+                        </div>
+                    </div>`);
+
+                // ── SUMMARY BAR ────────────────────────────────────────────
+                const summaryCard = card('📊 Match Summary', `
+                    <div style="display:flex; justify-content:space-around; text-align:center;">
+                        <div><div style="font-size:22px; font-weight:800; color:#1565c0;">${STATE.turnCount}</div>
+                             <div style="font-size:9px; color:#888; text-transform:uppercase; letter-spacing:1px;">Turns</div></div>
+                        <div><div style="font-size:22px; font-weight:800; color:#2e7d32;">${pTotalDmg}</div>
+                             <div style="font-size:9px; color:#888; text-transform:uppercase; letter-spacing:1px;">Your Dmg</div></div>
+                        <div><div style="font-size:22px; font-weight:800; color:#f57f17;">${pKills}</div>
+                             <div style="font-size:9px; color:#888; text-transform:uppercase; letter-spacing:1px;">Kills</div></div>
+                        <div><div style="font-size:22px; font-weight:800; color:#b71c1c;">${eTotalDmg}</div>
+                             <div style="font-size:9px; color:#888; text-transform:uppercase; letter-spacing:1px;">Bandit Dmg</div></div>
+                    </div>`);
+
+                // ── RETURN BUTTON ──────────────────────────────────────────
+                const returnBtn = `<button class="btn-start" style="width:100%; margin-top:4px; border-radius:8px;"
+                    onclick="window.finishGameAndSave(${isWin})">RETURN TO COMMAND CENTER</button>`;
+
+                document.getElementById('report-content').innerHTML =
+                    card('⚔ Unit Battle Log', unitRows) +
+                    bestCard +
+                    banditCard +
+                    summaryCard +
+                    returnBtn;
+
+                document.getElementById('end-title').innerText = isWin ? "VICTORY ACHIEVED" : "TOTAL DEFEAT";
+                document.getElementById('end-title').style.color = isWin ? "#00ff44" : "#ff3333";
+                document.getElementById('end-screen').classList.remove('hidden');
+                BGM.stopAll();
+                SFX.stopAmbience();
+            }
+        }
+    };
+
+    const ENGINE = {
+        scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 0.1, 1000), renderer: new THREE.WebGLRenderer({ antialias: true, alpha: true }),
+        controls: null, raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2(),
+        ambLight: null, dirLight: null,
+
+        getTilePos: function(x, z) {
+            const offX = (CONFIG.gridX * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2); 
+            const offZ = (CONFIG.gridZ * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
+            return new THREE.Vector3(x * CONFIG.tileSize - offX, 0, z * CONFIG.tileSize - offZ);
+        },
+
+        init: function() {
+            this.camera.position.set(10, 16, 12);
+            this.renderer.setSize(window.innerWidth, window.innerHeight); this.renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(this.renderer.domElement);
+
+            this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+            this.controls.enableDamping = true; this.controls.dampingFactor = 0.05; this.controls.enablePan = false; 
+            
+            // FIXED CAMERA: Locked Polar Angle. You can only orbit horizontally (spin the compass).
+            this.controls.minPolarAngle = Math.PI / 3; 
+            this.controls.maxPolarAngle = Math.PI / 3; 
+            this.controls.minDistance = 10; this.controls.maxDistance = 25;
+
+            this.ambLight = new THREE.AmbientLight(0xffffff, 0.8); this.scene.add(this.ambLight);
+            this.dirLight = new THREE.DirectionalLight(0xffffff, 0.6); this.dirLight.position.set(15, 20, 5); this.scene.add(this.dirLight);
+
+            const gPlane = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.gridX * CONFIG.tileSize + 2, CONFIG.gridZ * CONFIG.tileSize + 2), new THREE.MeshToonMaterial({ color: '#2b1b17' })); 
+            gPlane.rotation.x = -Math.PI / 2; gPlane.position.y = -0.3; this.scene.add(gPlane);
+
+            const gridGroup = new THREE.Group();
+            STATE.hitTiles = []; // The dedicated array to guarantee perfect taps
+            
+            const baseGeo = new THREE.BoxGeometry(CONFIG.tileSize - CONFIG.tileGap, 0.25, CONFIG.tileSize - CONFIG.tileGap);
+            const topGeo = new THREE.BoxGeometry(CONFIG.tileSize - CONFIG.tileGap - 0.08, 0.1, CONFIG.tileSize - CONFIG.tileGap - 0.08);
+            const matBase = new THREE.MeshToonMaterial({ color: '#795548' }); 
+            const matTop = new THREE.MeshToonMaterial({ color: '#aed581' }); 
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0x4e342e, linewidth: 2 });
+            const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+
+            for(let x=0; x<CONFIG.gridX; x++) { 
+                STATE.mapData[x] = []; 
+                for(let z=0; z<CONFIG.gridZ; z++) {
+                    let tileGroup = new THREE.Group();
+                    let b = new THREE.Mesh(baseGeo, matBase); b.position.y = -0.125;
+                    let t = new THREE.Mesh(topGeo, matTop); t.position.y = 0.05;
+                    t.add(new THREE.LineSegments(new THREE.EdgesGeometry(topGeo), edgeMat));
+                    
+                    tileGroup.add(b); tileGroup.add(t);
+                    tileGroup.position.copy(this.getTilePos(x, z));
+                    
+                    let hitGeo = new THREE.Mesh(new THREE.BoxGeometry(1, 0.4, 1), hitMat);
+                    hitGeo.userData = { x, z, occ: null, type: 'Plains' };
+                    hitGeo.position.copy(tileGroup.position); // Align hitbox to the world
+                    
+                    STATE.hitTiles.push(hitGeo); // Push to the strict hit array
+                    gridGroup.add(tileGroup); this.scene.add(hitGeo); // Add hitbox directly to scene
+                    STATE.mapData[x][z] = hitGeo;
+                }
+            }
+            this.scene.add(gridGroup); this.scene.add(STATE.hlGroup); this.scene.add(STATE.tgtGroup); this.scene.add(STATE.faceGroup);
+
+            this.setupInteractions();
+            window.addEventListener("resize", () => { this.camera.aspect = window.innerWidth / window.innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(window.innerWidth, window.innerHeight); });
+            this.renderLoop();
+        },
+
+        updateAtmosphere: function() {
+            if (STATE.weather.id === 'Sun') {
+                this.scene.background = new THREE.Color('#87CEEB'); 
+                this.scene.fog = null;
+                this.ambLight.color.setHex(0xffffff); this.ambLight.intensity = 0.9;
+                this.dirLight.intensity = 0.8;
+            } else if (STATE.weather.id === 'Moon') {
+                this.scene.background = new THREE.Color('#0a1423'); 
+                this.scene.fog = new THREE.FogExp2('#0a1423', 0.035); 
+                this.ambLight.color.setHex(0x405070); this.ambLight.intensity = 0.5; 
+                this.dirLight.intensity = 0.2;
+            } else if (STATE.weather.id === 'Rain') {
+                this.scene.background = new THREE.Color('#546e7a'); 
+                this.scene.fog = new THREE.FogExp2('#546e7a', 0.06); 
+                this.ambLight.color.setHex(0x90a4ae); this.ambLight.intensity = 0.6;
+                this.dirLight.intensity = 0.4;
+            }
+        },
+
+        startBattle: function() {
+            document.getElementById('draft-screen').classList.add('hidden'); 
+            document.getElementById('battle-meter-container').classList.remove('hidden'); 
+            document.getElementById('weather-compass-group').classList.remove('hidden');
+            document.getElementById('tile-panel').classList.remove('hidden');
+            
+            this.updateAtmosphere();
+            BGM.playAmbient();
+            SFX.startAmbience(STATE.weather.id);
+
+            const pC = [{x:3,z:12}, {x:4,z:12}, {x:5,z:12}, {x:6,z:12}]; const eC = [{x:3,z:1}, {x:4,z:1}, {x:5,z:1}, {x:6,z:1}];
+            UI.playerDraft.forEach((t, i) => this.spawnUnit(t, pC[i].x, pC[i].z, 'player', i));
+            UI.enemyDraft.forEach((t, i) => this.spawnUnit(t, eC[i].x, eC[i].z, 'enemy', i+4));
+            
+            STATE.units.forEach(u => u.ui.classList.remove('hidden')); STATE.phase = 'IDLE';
+            UI.updateMeter(); COMBAT.updateVision();
+        },
+
+        spawnUnit: function(type, x, z, team, id) {
+            const cls = CONFIG.classes[type]; const group = new THREE.Group();
+            let mesh, bGeo; const bMat = new THREE.MeshToonMaterial({ color: cls.color });
+            
+            if (cls.shape === 'square') { bGeo = new THREE.BoxGeometry(0.5, 0.6, 0.5); } 
+            else if (cls.shape === 'triangle') { 
+                const shape = new THREE.Shape(); shape.moveTo(-0.25, -0.25); shape.lineTo(0.25, -0.25); shape.lineTo(0, 0.35); shape.lineTo(-0.25, -0.25);
+                bGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.6, bevelEnabled: false }); bGeo.rotateX(-Math.PI / 2); bGeo.translate(0, -0.3, 0); 
+            } 
+            else if (cls.shape === 'long_rect') { bGeo = new THREE.BoxGeometry(0.5, 0.5, 0.9); }
+            else if (cls.shape === 'stick') { bGeo = new THREE.BoxGeometry(0.15, 0.15, 0.9); } 
+
+            mesh = new THREE.Mesh(bGeo, bMat); mesh.position.y = 0.35;
+
+            // Facing dot lives on the GROUP (not the box mesh), so it
+            // stays put once the real model swaps in and the box is removed.
+            let dotGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+            let dotMat = new THREE.MeshBasicMaterial({color: team === 'player' ? 0x00aaff : 0xff0000});
+            let faceInd = new THREE.Mesh(dotGeo, dotMat);
+            let frontZ = -0.25; if(cls.shape === 'long_rect' || cls.shape === 'stick') frontZ = -0.45;
+            faceInd.position.set(0, 0.45, frontZ); group.add(faceInd);
+
+            let eColor = team === 'player' ? 0xffffff : 0x111111;
+            let edges = new THREE.LineSegments(new THREE.EdgesGeometry(bGeo), new THREE.LineBasicMaterial({ color: eColor, linewidth: 2 }));
+            mesh.add(edges); group.add(mesh);
+
+            // Figure-ground base plate: a flat square centered on the
+            // tile, sized 1/4 the tile width, colored in a pastel tone
+            // of the unit's team (bandit = dove-pale grey). Marks each
+            // unit's footing clearly regardless of what model is on top.
+            const baseSize = CONFIG.tileSize / 4;
+            const baseThickness = 0.3; // 3x thicker per revision request
+            const baseGeo2 = new THREE.BoxGeometry(baseSize, baseThickness, baseSize);
+            // MeshBasicMaterial (unlit) so the plate reads its true pastel
+            // color regardless of scene lighting — MeshToonMaterial was
+            // going near-black under weak night/moonlight, which is why
+            // only the archer's plate (catching more light) looked visible.
+            const baseMat = new THREE.MeshBasicMaterial({ color: pastelizeForTeam(team, cls.color) });
+            const basePlate = new THREE.Mesh(baseGeo2, baseMat);
+            basePlate.position.y = 0.35; // raised for clearance, matches old placeholder box height
+            group.add(basePlate);
+
+            group.position.copy(this.getTilePos(x, z)); group.rotation.y = team === 'player' ? 0 : Math.PI; this.scene.add(group);
+
+            // Try to load the real designed model. If it fails, the box
+            // above stays visible as-is — see loadUnitModel/showAudioDebug.
+            loadUnitModel(type, group, mesh, edges);
+
+            let ui = document.createElement('div'); ui.className = 'f-ui hidden'; 
+            ui.innerHTML = `<div class="f-icon">${cls.sign}</div>
+            <div class="f-stats-box">
+                <div class="bar-container"><span class="stat-num" id="hp-txt-${id}">${cls.hp}</span><div class="bar-bg"><div class="bar-hp" id="h-${id}"></div></div></div>
+                <div class="bar-container"><span class="stat-num" style="color:#00ccff;" id="st-txt-${id}">100</span><div class="bar-bg" style="height:3px;"><div class="bar-st" id="s-${id}"></div></div></div>
+            </div>`; 
+            document.body.appendChild(ui);
+            
+            let u = {id:id, tm:team, type:type, hp:cls.hp, mHp:cls.hp, st:100, dmgDealt:0, x:x, z:z, m:group, ui:ui, act:0, rch:[], path:[]};
+            STATE.mapData[x][z].userData.occ = u; STATE.units.push(u);
+        },
+
+        highlightFacing: function(u) {
+            STATE.faceGroup.clear(); const hMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.5 });
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]]; 
+            dirs.forEach(d => {
+                let tx = u.x + d[0], tz = u.z + d[1];
+                if(tx>=0 && tx<CONFIG.gridX && tz>=0 && tz<CONFIG.gridZ) {
+                    let hm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.9), hMat); hm.position.copy(this.getTilePos(tx, tz)); hm.position.y += 0.2; hm.userData = { dx: d[0], dz: d[1] }; STATE.faceGroup.add(hm);
+                }
+            });
+        },
+
+        setupInteractions: function() {
+            // FIXED INTERACTION: Direct canvas listener, strictly raycasting the hitTiles array
+            this.renderer.domElement.addEventListener('pointerdown', (e) => {
+                this.pointer.x = (e.clientX / window.innerWidth) * 2 - 1; this.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                this.raycaster.setFromCamera(this.pointer, this.camera);
+                
+                if(STATE.phase === 'FACE') {
+                    const faceIntersects = this.raycaster.intersectObjects(STATE.faceGroup.children);
+                    if(faceIntersects.length > 0) {
+                        let d = faceIntersects[0].object.userData;
+                        if(d.dz === -1) STATE.activeUnit.m.rotation.y = 0; else if(d.dz === 1) STATE.activeUnit.m.rotation.y = Math.PI; else if(d.dx === -1) STATE.activeUnit.m.rotation.y = Math.PI/2; else if(d.dx === 1) STATE.activeUnit.m.rotation.y = -Math.PI/2;
+                        if (PVP.active) window.MatchSync.submitAction(window.MatchSync.ACTION.FACE, { unitId: STATE.activeUnit.id, rotY: STATE.activeUnit.m.rotation.y });
+                        STATE.faceGroup.clear();
+                        let tgts = COMBAT.getValidTargets(STATE.activeUnit);
+                        if(tgts.length > 0) { STATE.validTargets = tgts; STATE.phase = 'ACT'; UI.setPad('p-act', true); return; } this.endTurn(); return;
+                    }
+                }
+
+                // Strict raycast against the invisible tile hitboxes ONLY.
+                const intersects = this.raycaster.intersectObjects(STATE.hitTiles);
+                if(intersects.length > 0) {
+                    let obj = intersects[0].object;
+                    let u = obj.userData.occ;
+                    
+                    if(STATE.phase === 'IDLE') { 
+                        UI.showUnitPanel(u);
+                        if(u && u.tm === 'player' && !u.act && u.hp > 0) { STATE.activeUnit = u; STATE.phase = 'SEL_MOVE'; this.highlightRange(u); UI.setPad('p-stay', true); } 
+                    }
+                    else if(STATE.phase === 'SEL_MOVE') { 
+                        if(STATE.activeUnit.rch.find(n => n.x === obj.userData.x && n.z === obj.userData.z) && !u) { STATE.pendingTile = obj; STATE.phase = 'CONF'; UI.setPad('p-stay', false); UI.setPad('p-conf', true); } 
+                        else if(u === STATE.activeUnit) { document.getElementById('b-stay').click(); } 
+                        else { STATE.phase = 'IDLE'; STATE.activeUnit = null; STATE.hlGroup.clear(); UI.setPad('p-stay', false); UI.showUnitPanel(null); } 
+                    }
+                    else if(STATE.phase === 'SEL_TARGET') {
+                        if(u && STATE.validTargets.includes(u)) {
+                            STATE.tgtGroup.clear(); UI.setPad('p-sel', false);
+                            const atkId = STATE.activeUnit.id, defId = u.id;
+                            const result = COMBAT.executeAttack(STATE.activeUnit, u);
+                            if (PVP.active) window.MatchSync.submitAction(window.MatchSync.ACTION.ATTACK, { atkId, defId, ...result });
+                            this.endTurn();
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('b-ok').onclick = () => { 
+                UI.setPad('p-conf', false); let p = COMBAT.getPath(STATE.activeUnit.x, STATE.activeUnit.z, STATE.pendingTile.userData.x, STATE.pendingTile.userData.z); 
+                STATE.activeUnit.st -= (p.length * 5); document.getElementById(`st-txt-${STATE.activeUnit.id}`).innerText = STATE.activeUnit.st; document.getElementById(`s-${STATE.activeUnit.id}`).style.width = `${STATE.activeUnit.st}%`;
+                STATE.mapData[STATE.activeUnit.x][STATE.activeUnit.z].userData.occ = null; STATE.activeUnit.x = STATE.pendingTile.userData.x; STATE.activeUnit.z = STATE.pendingTile.userData.z; 
+                STATE.pendingTile.userData.occ = STATE.activeUnit; STATE.activeUnit.path = p; STATE.phase = 'MOV'; STATE.hlGroup.clear(); UI.showUnitPanel(STATE.activeUnit);
+                if (PVP.active) window.MatchSync.submitAction(window.MatchSync.ACTION.MOVE, { unitId: STATE.activeUnit.id, path: p, st: STATE.activeUnit.st });
+            };
+            document.getElementById('b-can').onclick = () => { STATE.phase = 'IDLE'; STATE.activeUnit = null; STATE.hlGroup.clear(); UI.setPad('p-conf', false); UI.showUnitPanel(null); };
+            document.getElementById('b-stay').onclick = () => { UI.setPad('p-stay', false); STATE.hlGroup.clear(); STATE.phase = 'FACE'; ENGINE.highlightFacing(STATE.activeUnit); };
+            document.getElementById('b-atk').onclick = () => { 
+                UI.setPad('p-act', false); STATE.phase = 'SEL_TARGET'; UI.setPad('p-sel', true); STATE.tgtGroup.clear();
+                STATE.validTargets.forEach(tgt => {
+                    let hm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.9), new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.6 }));
+                    hm.position.copy(this.getTilePos(tgt.x, tgt.z)); hm.position.y += 0.2; STATE.tgtGroup.add(hm); 
+                });
+            };
+            document.getElementById('b-can-sel').onclick = () => { UI.setPad('p-sel', false); STATE.tgtGroup.clear(); STATE.phase = 'ACT'; UI.setPad('p-act', true); };
+            document.getElementById('b-wat').onclick = () => { UI.setPad('p-act', false); this.endTurn(); };
+        },
+
+        highlightRange: function(u) {
+            STATE.hlGroup.clear(); let rch = COMBAT.getReachable(u); u.rch = rch;
+            const hMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.3 });
+            rch.forEach(n => { 
+                if(n.x === u.x && n.z === u.z) return; 
+                let hm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.9), hMat); hm.position.copy(this.getTilePos(n.x, n.z)); hm.position.y += 0.2; STATE.hlGroup.add(hm); 
+            }); 
+        },
+
+        endTurn: function() { 
+            STATE.activeUnit.act = 1; STATE.activeUnit.st = Math.min(100, STATE.activeUnit.st + 15); 
+            document.getElementById(`st-txt-${STATE.activeUnit.id}`).innerText = STATE.activeUnit.st; document.getElementById(`s-${STATE.activeUnit.id}`).style.width = `${STATE.activeUnit.st}%`;
+            UI.showUnitPanel(null); COMBAT.updateVision(); 
+            if(STATE.phase === 'END') return; 
+
+            if (PVP.active) {
+                if (STATE.units.filter(u => u.tm === 'player' && u.hp > 0).every(u => u.act)) {
+                    STATE.phase = 'E_TURN'; // no local input while waiting on Firestore round-trip
+                    window.MatchSync.endTurn();
+                } else {
+                    STATE.phase = 'IDLE';
+                }
+                return;
+            }
+
+            if(STATE.units.filter(u => u.tm === 'player' && u.hp > 0).every(u => u.act)) this.startEnemyAI(); else { STATE.phase = 'IDLE'; } 
+        },
+
+        startEnemyAI: function() { 
+            if(STATE.phase === 'END') return; 
+            STATE.phase = 'E_TURN'; document.getElementById('turn-overlay').classList.remove('hidden'); 
+            let en = STATE.units.filter(u => u.tm === 'enemy' && u.hp > 0), pl = STATE.units.filter(u => u.tm === 'player' && u.hp > 0), idx = 0;
+            
+            const nextBot = () => { 
+                if(STATE.phase === 'END') return; 
+                if(idx >= en.length || pl.length === 0) { STATE.turnCount++; setTimeout(() => { STATE.units.forEach(u => u.act = 0); document.getElementById('turn-overlay').classList.add('hidden'); STATE.phase = 'IDLE'; COMBAT.updateVision(); }, 1000); return; }
+                let b = en[idx]; STATE.activeUnit = b; 
+                let cp = pl[0], md = 999; pl.forEach(p => { let d = Math.abs(p.x - b.x) + Math.abs(p.z - b.z); if(d < md) { md = d; cp = p; }}); b.tTgt = cp;
+                
+                b.m.lookAt(cp.m.position.x, b.m.position.y, cp.m.position.z); 
+                let dx = Math.sign(cp.x - b.x), dz = Math.sign(cp.z - b.z);
+                if(dx === 0 || dz === 0 || b.type === 'archer') { 
+                    if(Math.abs(dx) > Math.abs(dz)) b.m.rotation.y = dx === -1 ? Math.PI/2 : -Math.PI/2; else b.m.rotation.y = dz === -1 ? 0 : Math.PI;
+                    let tgts = COMBAT.getValidTargets(b);
+                    if(tgts.includes(cp)) { COMBAT.executeAttack(b,cp); COMBAT.recoverStamina(b); idx++; setTimeout(nextBot, 1500); return; }
+                }
+
+                let pt = COMBAT.getPath(b.x, b.z, cp.x, cp.z);
+                if(pt.length > 0) { 
+                    pt.pop(); let maxSteps = Math.min(COMBAT.calcMove(b), Math.floor(b.st / 5)); let r = pt.length > maxSteps ? pt.slice(0, maxSteps) : pt; 
+                    if(r.length > 0) { 
+                        let fd = r[r.length-1]; b.st -= (r.length * 5); document.getElementById(`st-txt-${b.id}`).innerText=b.st; document.getElementById(`s-${b.id}`).style.width=`${b.st}%`;
+                        STATE.mapData[b.x][b.z].userData.occ = null; b.x = fd.x; b.z = fd.z; STATE.mapData[fd.x][fd.z].userData.occ = b; b.path = r; STATE.phase = 'MOV_B'; 
+                        b.onF = () => { 
+                            b.m.lookAt(b.tTgt.m.position.x, b.m.position.y, b.tTgt.m.position.z); let ndx = Math.sign(b.tTgt.x - b.x), ndz = Math.sign(b.tTgt.z - b.z);
+                            if(Math.abs(ndx) > Math.abs(ndz)) b.m.rotation.y = ndx === -1 ? Math.PI/2 : -Math.PI/2; else b.m.rotation.y = ndz === -1 ? 0 : Math.PI;
+                            let tgts = COMBAT.getValidTargets(b);
+                            if(tgts.length > 0) { COMBAT.executeAttack(b, tgts[0]); COMBAT.recoverStamina(b); setTimeout(nextBot, 1500); } else { COMBAT.recoverStamina(b); setTimeout(nextBot, 500); } 
+                            idx++;
+                        }; return;
+                    }
+                }
+                idx++; COMBAT.recoverStamina(b); setTimeout(nextBot, 500); 
+            }; setTimeout(nextBot, 1000); 
+        },
+
+        renderLoop: function() {
+            requestAnimationFrame(() => this.renderLoop()); let dt = STATE.clock.getDelta();
+            
+            if(STATE.wind) {
+                let camAngle = THREE.MathUtils.radToDeg(this.controls.getAzimuthalAngle());
+                let arrowRot = STATE.wind.deg + camAngle;
+                document.getElementById('compass-arrow').style.transform = `rotate(${arrowRot}deg)`;
+            }
+
+            if((STATE.phase === 'MOV' || STATE.phase === 'MOV_B') && STATE.activeUnit && STATE.activeUnit.path.length > 0) {
+                let n = STATE.activeUnit.path[0], tv = this.getTilePos(n.x, n.z); let activeM = STATE.activeUnit.m; activeM.lookAt(tv.x, activeM.position.y, tv.z);
+                let dist = activeM.position.distanceTo(new THREE.Vector3(tv.x, activeM.position.y, tv.z));
+                if(dist <= CONFIG.walkSpeed * dt) { activeM.position.x = tv.x; activeM.position.z = tv.z; STATE.activeUnit.path.shift(); } 
+                else { let dir = new THREE.Vector3(tv.x - activeM.position.x, 0, tv.z - activeM.position.z).normalize(); activeM.position.add(dir.multiplyScalar(CONFIG.walkSpeed * dt)); }
+                if(STATE.activeUnit.path.length === 0) { 
+                    if(STATE.phase === 'MOV') { STATE.phase = 'FACE'; ENGINE.highlightFacing(STATE.activeUnit); } else { STATE.phase = 'E_TURN'; STATE.activeUnit.onF(); } 
+                }
+            }
+            STATE.units.forEach(u => { 
+                if(u.hp > 0 && u.m.visible) { 
+                    let pos = UI.toScreenPosition(u.m.position.clone().add(new THREE.Vector3(0, 1.6, 0))); 
+                    u.ui.style.left = `${pos.x}px`; u.ui.style.top = `${pos.y}px`; 
+                } 
+            }); 
+            this.controls.update(); this.renderer.render(this.scene, this.camera);
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════
+    //  PvpFlow — bridges MatchSync (Firestore) to the local
+    //  ENGINE/STATE/COMBAT/UI objects above. Only runs when
+    //  PVP.active is true (see PVP block near the top of STATE).
+    //
+    //  window.MatchSync is set by the module script at the
+    //  bottom of this file (ES module imports can't be used in
+    //  this classic <script>, so it's attached to window once
+    //  the module has loaded).
+    // ═══════════════════════════════════════════════════════
+    const PvpFlow = {
+
+        // Called once, after auth resolves, if PVP.active.
+        begin: async function() {
+            const MS = window.MatchSync;
+            await MS.resume(PVP.matchId, PVP.myRole, PVP.wsHost);
+            MS.listenMatch((data) => this.onMatchUpdate(data));
+            MS.listenActions((action) => this.onAction(action));
+        },
+
+        onMatchUpdate: function(data) {
+            if (!data) {
+                // Match doc deleted — the other side declined/cancelled before
+                // the battle actually started. Nothing to clean up mid-fight
+                // since this only fires pre-spawn.
+                if (!PVP.battleStarted) {
+                    alert('The match was cancelled or declined.');
+                    window.location.href = 'friends.html';
+                }
+                return;
+            }
+
+            // Pull weather/wind from the match doc — host rolled it once at
+            // room creation so both clients calculate identically. Never
+            // roll it locally in pvp (that would desync archer wind bonus,
+            // rain move penalty, etc. between the two phones).
+            if (data.weather && !STATE.weather) {
+                STATE.weather = data.weather; STATE.wind = data.wind;
+                document.getElementById('weather-icon-center').innerText = STATE.weather.icon;
+                document.getElementById('global-condition').innerText = `${STATE.weather.icon} ${STATE.weather.cond}`;
+                const atmo = document.getElementById('atmosphere-layer');
+                atmo.className = STATE.weather.id === 'Rain' ? 'rain-fx' : STATE.weather.id === 'Moon' ? 'night-fx' : '';
+            }
+
+            // Needed later for the World Feed battle-report card.
+            if (data.hostName) PVP.hostName = data.hostName;
+            if (data.guestName) PVP.guestName = data.guestName;
+
+            const wasMyTurn = PVP.turnTeam === PVP.myRole;
+            PVP.turnTeam = data.turnTeam;
+            const isMyTurnNow = PVP.turnTeam === PVP.myRole;
+            if (!wasMyTurn && isMyTurnNow && PVP.battleStarted) {
+                STATE.units.forEach(u => { if (u.tm === 'player') u.act = 0; });
+                STATE.turnCount++;
+            }
+
+            // Host is responsible for spawning once both sides have locked
+            // their draft — writes one SPAWN action both clients replay.
+            if (data.status === 'drafting' && data.hostReady && data.guestReady
+                && PVP.myRole === 'host' && !PVP._spawnSent) {
+                PVP._spawnSent = true;
+                const pC = [{x:3,z:12},{x:4,z:12},{x:5,z:12},{x:6,z:12}];
+                const eC = [{x:3,z:1},{x:4,z:1},{x:5,z:1},{x:6,z:1}];
+                const spawnList = [];
+                data.hostDraft.forEach((t,i)  => spawnList.push({ type: t, x: pC[i].x, z: pC[i].z, role: 'host'  }));
+                data.guestDraft.forEach((t,i) => spawnList.push({ type: t, x: eC[i].x, z: eC[i].z, role: 'guest' }));
+                window.MatchSync.submitAction(window.MatchSync.ACTION.SPAWN, { units: spawnList }).then(() => {
+                    window.MatchSync.startMatch();
+                });
+            }
+
+            if (data.status === 'finished' && STATE.phase !== 'END') {
+                STATE.phase = 'END';
+            }
+
+            this.updateTurnUI();
+        },
+
+        onAction: function(action) {
+            const MS = window.MatchSync;
+            switch (action.type) {
+                case MS.ACTION.SPAWN:
+                    if (!PVP.battleStarted) this.applySpawn(action.payload);
+                    break;
+                case MS.ACTION.MOVE:
+                    if (action.by !== PVP.myRole) this.applyRemoteMove(action.payload);
+                    break;
+                case MS.ACTION.FACE:
+                    if (action.by !== PVP.myRole) this.applyRemoteFace(action.payload);
+                    break;
+                case MS.ACTION.ATTACK:
+                    if (action.by !== PVP.myRole) this.applyRemoteAttack(action.payload);
+                    break;
+                // END_TURN / DRAFT_LOCK / SURRENDER need no direct replay here —
+                // their effects come through the match doc listener above.
+            }
+        },
+
+        // Draft screen "ENTER BATTLE" button, pvp branch (see UI.onEnterBattle).
+        lockAndWait: async function() {
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-start').innerText = 'WAITING FOR OPPONENT...';
+            await window.MatchSync.lockDraft(UI.playerDraft.slice());
+        },
+
+        applySpawn: function(payload) {
+            document.getElementById('draft-screen').classList.add('hidden');
+            document.getElementById('battle-meter-container').classList.remove('hidden');
+            document.getElementById('weather-compass-group').classList.remove('hidden');
+            document.getElementById('tile-panel').classList.remove('hidden');
+
+            ENGINE.updateAtmosphere();
+            BGM.playAmbient();
+            SFX.startAmbience(STATE.weather.id);
+
+            payload.units.forEach((u, i) => {
+                const tm = (u.role === PVP.myRole) ? 'player' : 'enemy';
+                ENGINE.spawnUnit(u.type, u.x, u.z, tm, i);
+            });
+            STATE.units.forEach(u => u.ui.classList.remove('hidden'));
+
+            PVP.battleStarted = true;
+            STATE.turnCount = 1;
+            UI.updateMeter(); COMBAT.updateVision();
+            this.updateTurnUI();
+        },
+
+        applyRemoteMove: function(payload) {
+            const u = STATE.units.find(x => x.id === payload.unitId);
+            if (!u || !payload.path || payload.path.length === 0) return;
+            const dest = payload.path[payload.path.length - 1];
+            STATE.mapData[u.x][u.z].userData.occ = null;
+            u.x = dest.x; u.z = dest.z;
+            STATE.mapData[u.x][u.z].userData.occ = u;
+            const tv = ENGINE.getTilePos(u.x, u.z);
+            u.m.position.set(tv.x, u.m.position.y, tv.z); // snap — no walk animation for the remote unit yet
+            u.st = payload.st;
+            document.getElementById(`st-txt-${u.id}`).innerText = u.st;
+            document.getElementById(`s-${u.id}`).style.width = `${u.st}%`;
+        },
+
+        applyRemoteFace: function(payload) {
+            const u = STATE.units.find(x => x.id === payload.unitId);
+            if (u) u.m.rotation.y = payload.rotY;
+        },
+
+        applyRemoteAttack: function(payload) {
+            const atk = STATE.units.find(x => x.id === payload.atkId);
+            const def = STATE.units.find(x => x.id === payload.defId);
+            if (!atk || !def) return;
+            if (!STATE.conflictStarted) { STATE.conflictStarted = true; BGM.triggerConflict(); }
+            SFX.playUnit(atk, 'attack');
+            if (payload.finalDmg > 0) {
+                atk.dmgDealt += payload.finalDmg;
+                COMBAT.applyDamage(def, payload.finalDmg, payload.prefix);
+                if (payload.specialEffect) COMBAT.applySpecialEffects(atk, def, payload.specialEffect);
+                setTimeout(() => { if (atk.hp > 0) COMBAT.applyDamage(atk, payload.recoilDmg, "RECOIL "); }, 800);
+            } else {
+                UI.spawnDamageBox(def, "0", payload.prefix);
+            }
+            UI.showUnitPanel(atk);
+        },
+
+        updateTurnUI: function() {
+            if (!PVP.battleStarted) return;
+            const overlay = document.getElementById('turn-overlay');
+            const myTurn = PVP.turnTeam === PVP.myRole;
+            if (myTurn) {
+                overlay.classList.add('hidden');
+                if (STATE.phase !== 'END') STATE.phase = 'IDLE';
+            } else {
+                overlay.querySelector('h2').innerText = "OPPONENT'S TURN...";
+                overlay.classList.remove('hidden');
+                if (STATE.phase !== 'END') STATE.phase = 'E_TURN';
+            }
+        },
+
+        // Simple pvp result screen — no bandit lore/report here since there's
+        // no bandit. Both clients call this independently off their own
+        // (identically-replayed) hp state, so both hit isWin correctly.
+        showEndScreen: function(isWin) {
+            const playerUnits = STATE.units.filter(u => u.tm === 'player');
+            const enemyUnits  = STATE.units.filter(u => u.tm === 'enemy');
+            const pDmg = playerUnits.reduce((s, u) => s + u.dmgDealt, 0);
+            const eDmg = enemyUnits.reduce((s, u) => s + u.dmgDealt, 0);
+
+            if (!PVP._resultSent) {
+                PVP._resultSent = true;
+                const winnerRole = isWin ? PVP.myRole : (PVP.myRole === 'host' ? 'guest' : 'host');
+                window.MatchSync.finishMatch(winnerRole);
+                if (window.savePvpBattleResult) window.savePvpBattleResult(isWin, STATE.turnCount, pDmg, eDmg);
+
+                if (window.postPvpBattleReport && !PVP.local && PVP.hostName && PVP.guestName) {
+                    const p1Name = PVP.myRole === 'host' ? PVP.hostName : PVP.guestName;
+                    const p2Name = PVP.myRole === 'host' ? PVP.guestName : PVP.hostName;
+                    const winnerName = isWin ? p1Name : p2Name;
+                    const p1Dmg = pDmg, p2Dmg = eDmg;
+                    window.postPvpBattleReport(PVP.matchId, {
+                        p1Name, p2Name, winnerName,
+                        turns: STATE.turnCount, p1Dmg, p2Dmg,
+                        mode: PVP.local ? 'pvp_local' : 'pvp_online',
+                    });
+                }
+            }
+            document.getElementById('turn-overlay').classList.add('hidden');
+            document.getElementById('weather-compass-group').classList.add('hidden');
+
+            document.getElementById('report-content').innerHTML = `
+                <div style="background:rgba(255,255,255,0.93); border-radius:10px; border:1.5px solid #ddd; padding:14px; text-align:center;">
+                    <div style="font-size:13px; color:#333; margin-bottom:12px;">
+                        Turns: ${STATE.turnCount} &nbsp;·&nbsp; Your Dmg: ${pDmg} &nbsp;·&nbsp; Opponent Dmg: ${eDmg}
+                    </div>
+                    <button class="btn-start" style="width:100%;" onclick="window.location.href='profile.html'">RETURN TO COMMAND CENTER</button>
+                </div>`;
+            document.getElementById('end-title').innerText = isWin ? "VICTORY" : "DEFEAT";
+            document.getElementById('end-title').style.color = isWin ? "#00ff44" : "#ff3333";
+            document.getElementById('end-screen').classList.remove('hidden');
+            BGM.stopAll(); SFX.stopAmbience();
+        },
+    };
+
+    window.onload = () => {
+        BGM.init(); SFX.init(); ENGINE.init();
+        window._battleState = STATE;
+        if (!PVP.active) { UI.initDraft(); } // pve: roll weather/wind/bot draft locally as before
+        else { document.getElementById('enemy-draft').innerText = 'VS OPPONENT'; }
+        // pvp: weather/draft/spawn all come from Firestore — see PvpFlow.begin(),
+        // kicked off from the module script below once auth resolves.
+    };
+</script>
+<script type="module">
+    import {
+        auth, db, onAuthStateChanged,
+        doc, getDoc, updateDoc, setDoc, increment, addDoc, collection, serverTimestamp,
+        savePvpLocalResult, postBattleReport,
+    } from "./js/firebase.config.js";
+    let currentUser = null;
+
+    // Bridge for the classic script (PvpFlow.showEndScreen) — same pattern
+    // as window.MatchSync below.
+    window.savePvpBattleResult = async function(isVictory, turns, pDmg, eDmg) {
+        if (!currentUser) return;
+        const userRef = doc(db, "users", currentUser.uid);
+        await savePvpLocalResult(userRef, { isVictory, turns, pDmg, eDmg });
+    };
+
+    window.postPvpBattleReport = async function(matchId, report) {
+        try { await postBattleReport(matchId, report); }
+        catch (e) { console.warn('[world feed] battle report post failed', e); }
+    };
+
+    // Backend for MatchSync is picked at runtime: local WebSocket relay for
+    // Bluetooth/Wi-Fi bench testing (pvplocaltest.html sets ?local=1&wsHost=...)
+    // vs the real Firestore-backed one, once the online lobby exists. Same
+    // public interface either way — PvpFlow above doesn't know which is loaded.
+    async function loadMatchSyncBackend() {
+        if (typeof PVP !== 'undefined' && PVP.local) {
+            const mod = await import("./js/match.sync.local.js");
+            return mod.MatchSyncLocal;
+        }
+        const mod = await import("./js/match.sync.js");
+        return mod.MatchSync;
+    }
+
+    // ── AUTH GUARD ─────────────────────────────────────────────────────────────
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            window.location.href = "login-signup.html";
+        } else {
+            currentUser = user;
+            if (typeof PVP !== 'undefined' && PVP.active) {
+                const kickoff = async () => {
+                    window.MatchSync = await loadMatchSyncBackend();
+                    PvpFlow.begin();
+                };
+                // Wait for ENGINE.init()/window.onload before touching the
+                // scene/DOM that PvpFlow.begin()'s callbacks will update.
+                if (document.readyState === 'complete') { kickoff(); }
+                else { window.addEventListener('load', kickoff); }
+            }
+        }
+    });
+
+    // ── FINISH & SAVE ──────────────────────────────────────────────────────────
+    window.finishGameAndSave = async function(isVictory) {
+
+        // Show saving state on button
+        const btn = document.querySelector('#report-content .btn-start');
+        if (btn) { btn.disabled = true; btn.innerText = "Saving..."; }
+
+        if (!currentUser) { window.location.href = "login-signup.html"; return; }
+
+        const S      = window._battleState || {};
+        const units  = S.units  || [];
+        const turns  = S.turnCount || 0;
+
+        const playerUnits = units.filter(u => u.tm === 'player');
+        const enemyUnits  = units.filter(u => u.tm === 'enemy');
+
+        const pDmg   = playerUnits.reduce((s, u) => s + u.dmgDealt, 0);
+        const eDmg   = enemyUnits.reduce((s, u) => s + u.dmgDealt, 0);
+        const pKills = enemyUnits.filter(u => u.hp <= 0).length;
+        const pSurv  = playerUnits.filter(u => u.hp > 0).length;
+        const pLost  = playerUnits.filter(u => u.hp <= 0).length;
+
+        // Unit type usage
+        const typeCount = { sword: 0, archer: 0, horse: 0, spear: 0 };
+        playerUnits.forEach(u => { if (typeCount[u.type] !== undefined) typeCount[u.type]++; });
+
+        const userRef = doc(db, "users", currentUser.uid);
+
+        try {
+            // ── Read current doc first (needed for max/avg calculations) ──
+            const snap = await getDoc(userRef);
+            const d    = snap.exists() ? snap.data() : {};
+
+            const today      = new Date().toDateString();
+            const lastDate   = d.lastPlayedDate || "";
+            const resetToday = lastDate !== today;
+
+            const prevWins      = d.wins  || 0;
+            const prevMaxDmg    = d.maxDamagePerTurn || 0;
+            const prevTotalTurns= d.totalTurnsTaken  || 0;
+            const prevTotalDmg  = d.totalDamageDealt || 0;
+
+            // Avg turns to win — running average
+            let newAvgTurn = d.avgTurnToWin || 0;
+            if (isVictory) {
+                const wins = prevWins + 1;
+                newAvgTurn = Math.round(((d.avgTurnToWin || 0) * prevWins + turns) / wins);
+            }
+
+            // Max single-match damage dealt (per-match, not per-turn)
+            const newMaxDmg = Math.max(prevMaxDmg, pDmg);
+
+            // Avg dmg per turn across all turns ever played
+            const newTotalTurns = prevTotalTurns + turns;
+            const newTotalDmg   = prevTotalDmg + pDmg;
+
+            await updateDoc(userRef, {
+                wins:               isVictory ? increment(1) : increment(0),
+                losses:             isVictory ? increment(0) : increment(1),
+                totalDamageDealt:   increment(pDmg),
+                totalTurnsTaken:    increment(turns),
+                avgTurnToWin:       newAvgTurn,
+                maxDamagePerTurn:   newMaxDmg,
+                infantryUsage:      increment(typeCount.sword),
+                archerUsage:        increment(typeCount.archer),
+                horsemanUsage:      increment(typeCount.horse),
+                spearUsage:         increment(typeCount.spear),
+                battlesPlayedToday: resetToday ? 1 : increment(1),
+                lastPlayedDate:     today,
+            });
+
+            // ── Save match to history subcollection ──
+            await addDoc(collection(db, "users", currentUser.uid, "matchHistory"), {
+                result:    isVictory ? "win" : "loss",
+                turns:     turns,
+                pDmg:      pDmg,
+                eDmg:      eDmg,
+                kills:     pKills,
+                survived:  pSurv,
+                lost:      pLost,
+                unitTypes: typeCount,
+                mode:      "bandit",
+                timestamp: serverTimestamp()
+            });
+
+        } catch (err) {
+            console.error("Save failed:", err);
+            if (btn) { btn.disabled = false; btn.innerText = "RETRY — RETURN TO BASE"; }
+            return;
+        }
+
+        window.location.href = "profile.html";
+    };
+</script>
+</body>
+</html>

@@ -1,2 +1,2 @@
-# Glittz_final
-Test it friendly and arts
+# Glitz.-BATTLEsystem
+Created via Acode

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | PvP Online</title>
+    <script src="js/game.config.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+
+        .back-link { font-size: 12px; color: #71717a; text-decoration: none; }
+        .page-title { font-size: 15px; font-weight: bold; color: #18181b; }
+        .page-sub { font-size: 11px; color: #71717a; margin-bottom: 4px; }
+
+        .segment { background: #ffffff; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e4e4e7; }
+
+        .field-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+        .field-label { font-size: 11px; font-weight: bold; color: #52525b; }
+        .field-input { font-size: 13px; padding: 8px 10px; border: 1px solid #d4d4d8; border-radius: 8px; background: #fafafa; color: #27272a; }
+        .field-input:focus { outline: none; border-color: #1e40af; background: #ffffff; }
+
+        .btn { width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        .btn-primary { background: #1e40af; color: #fff; }
+        .btn-host { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .btn-join { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+
+        .mode-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+        .mode-toggle button { flex: 1; }
+        .hidden { display: none !important; }
+
+        .status-line { font-size: 12px; text-align: center; padding: 6px; color: #52525b; }
+        .status-error { color: #dc2626; font-weight: bold; }
+        .room-code { font-size: 32px; font-weight: bold; text-align: center; letter-spacing: 4px; color: #1e40af; margin: 10px 0; }
+        .waiting-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 6px; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .share-hint { font-size: 10px; color: #a1a1aa; text-align: center; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a class="back-link" href="profile.html">&larr; Back to Profile</a>
+    <div class="page-title">🌐 PvP Online</div>
+    <div class="page-sub">
+        Works over any internet connection — no proximity, no WiFi setup.
+        Create a room, share the code any way you like (WhatsApp, voice,
+        whatever), your friend types it in.
+    </div>
+
+    <div class="segment" id="roleSegment">
+        <div class="mode-toggle">
+            <button class="btn btn-host" id="btnShowHost">Host Room</button>
+            <button class="btn btn-join" id="btnShowJoin">Join Room</button>
+        </div>
+
+        <div id="hostPanel" class="hidden">
+            <button class="btn btn-primary" id="btnCreateRoom">Create Room</button>
+            <div id="hostStatus" class="status-line"></div>
+            <div id="roomCodeBox" class="hidden">
+                <div class="room-code" id="roomCodeText">-----</div>
+                <div class="share-hint">Send this code to your friend — any app works.</div>
+                <div class="status-line" id="hostWaitLine"><span class="waiting-dot"></span>Waiting for opponent to join...</div>
+                <button class="btn btn-primary hidden" id="btnEnterBattleHost">ENTER BATTLE SETUP</button>
+            </div>
+        </div>
+
+        <div id="joinPanel" class="hidden">
+            <div class="field-group">
+                <label class="field-label" for="codeInput">Room Code</label>
+                <input class="field-input" id="codeInput" placeholder="ABCDE" maxlength="5" style="text-transform:uppercase; letter-spacing:3px; text-align:center; font-size:16px;">
+            </div>
+            <button class="btn btn-primary" id="btnJoinRoom">Join Room</button>
+            <div id="joinStatus" class="status-line"></div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { auth, onAuthStateChanged, ensureUserDoc } from "./js/firebase.config.js";
+    import { MatchSync } from "./js/match.sync.js";
+
+    let username = "Commander";
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.href = "login-signup.html"; return; }
+        const userData = await ensureUserDoc(user);
+        username = userData.username || "Commander";
+    });
+
+    // Same weather/wind roll as pvplocaltest.html and friends.html — host
+    // rolls once so both sides calculate identically.
+    function rollWeather() {
+        const pool = [
+            { id: 'Sun',  icon: GLITZ_CONFIG.weather.sun.icon,  cond: 'Bright: High Stamina Drain' },
+            { id: 'Moon', icon: GLITZ_CONFIG.weather.moon.icon, cond: 'Night: Ally Vision Limited to 5' },
+            { id: 'Rain', icon: GLITZ_CONFIG.weather.rain.icon, cond: 'Mud: Move & Vision -1' },
+        ];
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+    function rollWind() {
+        return GLITZ_CONFIG.winds[Math.floor(Math.random() * GLITZ_CONFIG.winds.length)];
+    }
+
+    document.getElementById('btnShowHost').onclick = () => {
+        document.getElementById('hostPanel').classList.remove('hidden');
+        document.getElementById('joinPanel').classList.add('hidden');
+    };
+    document.getElementById('btnShowJoin').onclick = () => {
+        document.getElementById('joinPanel').classList.remove('hidden');
+        document.getElementById('hostPanel').classList.add('hidden');
+    };
+
+    let createdMatchId = null;
+
+    document.getElementById('btnCreateRoom').onclick = async () => {
+        const statusEl = document.getElementById('hostStatus');
+        statusEl.textContent = 'Creating room...'; statusEl.classList.remove('status-error');
+        document.getElementById('btnCreateRoom').disabled = true;
+        try {
+            const { matchId, code } = await MatchSync.createRoom(username, rollWeather(), rollWind());
+            createdMatchId = matchId;
+            statusEl.textContent = '';
+            document.getElementById('roomCodeText').textContent = code;
+            document.getElementById('roomCodeBox').classList.remove('hidden');
+            MatchSync.listenMatch((data) => {
+                if (data && data.guestName) {
+                    document.getElementById('hostWaitLine').innerHTML = `✅ ${data.guestName} joined!`;
+                    document.getElementById('btnEnterBattleHost').classList.remove('hidden');
+                }
+            });
+        } catch (e) {
+            statusEl.textContent = e.message || 'Could not create room.';
+            statusEl.classList.add('status-error');
+            document.getElementById('btnCreateRoom').disabled = false;
+        }
+    };
+
+    document.getElementById('btnEnterBattleHost').onclick = () => {
+        window.location.href = `battle.html?mode=pvp&match=${encodeURIComponent(createdMatchId)}&role=host`;
+    };
+
+    document.getElementById('btnJoinRoom').onclick = async () => {
+        const code = document.getElementById('codeInput').value.trim().toUpperCase();
+        if (code.length !== 5) { alert('Room codes are 5 characters.'); return; }
+        const statusEl = document.getElementById('joinStatus');
+        statusEl.textContent = 'Joining...'; statusEl.classList.remove('status-error');
+        document.getElementById('btnJoinRoom').disabled = true;
+        try {
+            const { matchId } = await MatchSync.joinRoomByCode(code, username);
+            statusEl.textContent = 'Joined! Entering battle setup...';
+            setTimeout(() => {
+                window.location.href = `battle.html?mode=pvp&match=${encodeURIComponent(matchId)}&role=guest`;
+            }, 500);
+        } catch (e) {
+            statusEl.textContent = e.message || 'Could not join.';
+            statusEl.classList.add('status-error');
+            document.getElementById('btnJoinRoom').disabled = false;
+        }
+    };
+</script>
+
+</body>
+</html>

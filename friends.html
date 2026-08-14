@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Commander's Keep | Friendly</title>
+    <script src="js/game.config.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f4f4f5;
+            color: #27272a;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            padding-bottom: 30px;
+        }
+        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+
+        .segment { background: #ffffff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e4e4e7; }
+        .segment-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #18181b; display: flex; justify-content: space-between; align-items: center; }
+
+        .tab-nav { display: flex; background: #ffffff; border-radius: 12px; border: 1px solid #e4e4e7; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .tab-item { flex: 1; text-align: center; padding: 10px 4px; font-size: 12px; font-weight: bold; color: #71717a; text-decoration: none; border-right: 1px solid #e4e4e7; transition: 0.15s; }
+        .tab-item:last-child { border-right: none; }
+        .tab-item:active { background: #f4f4f5; }
+        .tab-active { color: #3f51b5; background: #eef0fc; }
+        .hidden { display: none !important; }
+
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+        .toggle-label { font-size: 12px; font-weight: bold; color: #27272a; }
+        .toggle-note { font-size: 10px; color: #a1a1aa; margin-top: 2px; }
+        .switch { position: relative; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; inset: 0; background: #d4d4d8; border-radius: 24px; cursor: pointer; transition: 0.2s; }
+        .slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+        input:checked + .slider { background: #10b981; }
+        input:checked + .slider::before { transform: translateX(20px); }
+
+        .badge-count { background: #ef4444; color: #fff; font-size: 10px; font-weight: bold; border-radius: 10px; padding: 1px 7px; }
+
+        .nearby-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid #f4f4f5; }
+        .nearby-row:last-child { border-bottom: none; }
+        .nearby-name { font-size: 13px; font-weight: bold; color: #18181b; }
+        .nearby-dist { font-size: 10px; color: #71717a; }
+        .btn-challenge { background: #3f51b5; color: #fff; border: none; border-radius: 8px; padding: 7px 12px; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .btn-challenge:disabled { background: #d4d4d8; cursor: default; }
+
+        .invite-card { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+        .invite-name { font-size: 12px; font-weight: bold; color: #9a3412; margin-bottom: 6px; }
+        .invite-actions { display: flex; gap: 8px; }
+        .btn-accept { flex: 1; background: #10b981; color: #fff; border: none; border-radius: 6px; padding: 7px; font-size: 11px; font-weight: bold; }
+        .btn-decline { flex: 1; background: #f4f4f5; color: #71717a; border: 1px solid #d4d4d8; border-radius: 6px; padding: 7px; font-size: 11px; font-weight: bold; }
+
+        .empty-note { font-size: 11px; color: #a1a1aa; text-align: center; padding: 12px 4px; }
+        .btn-refresh { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #d4d4d8; background: #fafafa; color: #52525b; font-size: 11px; font-weight: bold; margin-top: 6px; }
+        .status-line { font-size: 11px; text-align: center; padding: 6px; color: #71717a; }
+        .status-error { color: #dc2626; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="tab-nav">
+        <a href="world.html" class="tab-item">World</a>
+        <a href="profile.html" class="tab-item">Profile</a>
+        <a href="friends.html" class="tab-item tab-active">Friendly</a>
+        <a href="settings.html" class="tab-item">Setting</a>
+    </div>
+
+    <div class="segment" id="invitesSegment" style="display:none;">
+        <div class="segment-title">⚔️ Challenges</div>
+        <div id="invitesList"></div>
+    </div>
+
+    <div class="segment">
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">Looking for a match</div>
+                <div class="toggle-note">Shares your approximate location only while this is ON.</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="lookingToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="status-line" id="lookingStatus"></div>
+    </div>
+
+    <div class="segment">
+        <div class="segment-title">
+            <span>📍 Nearby Commanders</span>
+            <span class="badge-count" id="nearbyCount">0</span>
+        </div>
+        <div id="nearbyList"><div class="empty-note">Turn on "Looking for a match" to see who's around.</div></div>
+        <button class="btn-refresh hidden" id="btnRefreshNearby">Refresh</button>
+    </div>
+
+    <div class="segment" id="listsSegment">
+        <div class="segment-title">🔍 Find Players</div>
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <input type="text" id="searchInput" placeholder="Search by username..." style="flex:1; font-size:12px; padding:8px 10px; border:1px solid #d4d4d8; border-radius:8px;">
+            <button id="searchBtn" style="padding:8px 14px; background:#3f51b5; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold;">Search</button>
+        </div>
+        <div id="searchResults"></div>
+
+        <div class="segment-title" style="margin-top:14px;">🤝 My Friends</div>
+        <div id="friendsList"><div class="empty-note">No friends added yet. Search above, or add one after a battle.</div></div>
+    </div>
+
+    <!-- Profile detail view — swapped in over the lists when a name is tapped -->
+    <div class="segment hidden" id="profileViewSegment">
+        <div style="font-size:12px; color:#3f51b5; font-weight:bold; cursor:pointer; margin-bottom:8px;" id="profileBackBtn">&larr; Back</div>
+        <div style="text-align:center;">
+            <div style="font-size:16px; font-weight:bold; color:#18181b;" id="pvName">-</div>
+            <div style="font-size:11px; margin:2px 0 10px;"><span id="pvOnlineDot" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#d4d4d8; margin-right:4px;"></span><span id="pvOnlineText" style="color:#a1a1aa;">Offline</span></div>
+            <div style="font-size:12px; color:#71717a; margin-bottom:4px;" id="pvTitle">Recruit</div>
+            <div style="display:flex; justify-content:center; gap:16px; margin:10px 0; font-size:11px; color:#52525b;">
+                <div><b id="pvWins">0</b> Wins</div>
+                <div><b id="pvLosses">0</b> Losses</div>
+                <div><b id="pvScore">0</b> Score</div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button id="pvChallengeBtn" style="flex:1; padding:9px; background:#3f51b5; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold;">Challenge</button>
+                <button id="pvFriendBtn" style="flex:1; padding:9px; background:#f4f4f5; color:#52525b; border:1px solid #d4d4d8; border-radius:8px; font-size:12px; font-weight:bold;">Add Friend</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import {
+        auth, db, onAuthStateChanged, ensureUserDoc, doc, getDoc,
+        searchUsersByUsername, addFriend, removeFriend, listenFriends,
+    } from "./js/firebase.config.js";
+    import { Presence } from "./js/presence.js";
+    import { MatchSync } from "./js/match.sync.js";
+
+    let username = "Commander";
+    let isLooking = false;
+    let myFriendUids = new Set();
+
+    function rollWeather() {
+        const pool = [
+            { id: 'Sun',  icon: GLITZ_CONFIG.weather.sun.icon,  cond: 'Bright: High Stamina Drain' },
+            { id: 'Moon', icon: GLITZ_CONFIG.weather.moon.icon, cond: 'Night: Ally Vision Limited to 5' },
+            { id: 'Rain', icon: GLITZ_CONFIG.weather.rain.icon, cond: 'Mud: Move & Vision -1' },
+        ];
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+    function rollWind() {
+        return GLITZ_CONFIG.winds[Math.floor(Math.random() * GLITZ_CONFIG.winds.length)];
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.href = "login-signup.html"; return; }
+        const userData = await ensureUserDoc(user);
+        username = userData.username || "Commander";
+
+        // General online status (separate from "looking for local match").
+        Presence.markOnline(userData);
+
+        // Incoming challenges — live, always listening regardless of toggle.
+        MatchSync.listenIncomingChallenges((invites) => renderInvites(invites));
+
+        // Friend list — live.
+        listenFriends(user, (friends) => renderFriends(friends));
+    });
+
+    function renderInvites(invites) {
+        const seg = document.getElementById('invitesSegment');
+        const list = document.getElementById('invitesList');
+        if (invites.length === 0) { seg.style.display = 'none'; return; }
+        seg.style.display = '';
+        list.innerHTML = '';
+        invites.forEach((inv) => {
+            const card = document.createElement('div');
+            card.className = 'invite-card';
+            card.innerHTML = `
+                <div class="invite-name">${inv.hostName} challenged you!</div>
+                <div class="invite-actions">
+                    <button class="btn-accept" data-id="${inv.id}">Accept</button>
+                    <button class="btn-decline" data-id="${inv.id}">Decline</button>
+                </div>`;
+            card.querySelector('.btn-accept').onclick = async () => {
+                await MatchSync.acceptChallenge(inv.id);
+                await Presence.stopLooking();
+                window.location.href = `battle.html?mode=pvp&match=${encodeURIComponent(inv.id)}&role=guest`;
+            };
+            card.querySelector('.btn-decline').onclick = async () => {
+                await MatchSync.declineChallenge(inv.id);
+            };
+            list.appendChild(card);
+        });
+    }
+
+    document.getElementById('lookingToggle').onchange = async (e) => {
+        const statusEl = document.getElementById('lookingStatus');
+        if (e.target.checked) {
+            statusEl.textContent = 'Getting your location...'; statusEl.classList.remove('status-error');
+            try {
+                await Presence.startLooking(username);
+                isLooking = true;
+                statusEl.textContent = "You're visible to nearby commanders.";
+                document.getElementById('btnRefreshNearby').classList.remove('hidden');
+                await refreshNearby();
+            } catch (err) {
+                e.target.checked = false;
+                statusEl.textContent = err.message; statusEl.classList.add('status-error');
+            }
+        } else {
+            await Presence.stopLooking();
+            isLooking = false;
+            statusEl.textContent = '';
+            document.getElementById('btnRefreshNearby').classList.add('hidden');
+            document.getElementById('nearbyList').innerHTML = '<div class="empty-note">Turn on "Looking for a match" to see who\'s around.</div>';
+            document.getElementById('nearbyCount').textContent = '0';
+        }
+    };
+
+    document.getElementById('btnRefreshNearby').onclick = refreshNearby;
+
+    async function refreshNearby() {
+        const listEl = document.getElementById('nearbyList');
+        listEl.innerHTML = '<div class="empty-note">Searching...</div>';
+        try {
+            const nearby = await Presence.findNearby();
+            document.getElementById('nearbyCount').textContent = nearby.length;
+            if (nearby.length === 0) {
+                listEl.innerHTML = '<div class="empty-note">No one nearby right now. Try again in a bit.</div>';
+                return;
+            }
+            listEl.innerHTML = '';
+            nearby.forEach((p) => {
+                const row = document.createElement('div');
+                row.className = 'nearby-row';
+                row.innerHTML = `
+                    <div>
+                        <div class="nearby-name">${p.username}</div>
+                        <div class="nearby-dist">${Presence.formatDistance(p.distanceM)}</div>
+                    </div>
+                    <button class="btn-challenge" data-uid="${p.uid}">Challenge</button>`;
+                row.querySelector('.btn-challenge').onclick = async (e) => {
+                    e.target.disabled = true; e.target.textContent = 'Sent...';
+                    try {
+                        const { matchId } = await MatchSync.createChallenge(p.uid, p.username, username, rollWeather(), rollWind());
+                        await Presence.stopLooking();
+                        window.location.href = `battle.html?mode=pvp&match=${encodeURIComponent(matchId)}&role=host`;
+                    } catch (err) {
+                        alert(err.message || 'Could not send challenge.');
+                        e.target.disabled = false; e.target.textContent = 'Challenge';
+                    }
+                };
+                listEl.appendChild(row);
+            });
+        } catch (err) {
+            listEl.innerHTML = `<div class="empty-note status-error">${err.message}</div>`;
+        }
+    }
+
+    // Stop broadcasting location if the person navigates away with the tab still on.
+    window.addEventListener('beforeunload', () => { if (isLooking) Presence.stopLooking(); });
+
+    // ── FRIEND LIST ───────────────────────────────────────
+    function renderFriends(friends) {
+        myFriendUids = new Set(friends.map(f => f.friendUid));
+        const el = document.getElementById('friendsList');
+        if (friends.length === 0) {
+            el.innerHTML = '<div class="empty-note">No friends added yet. Search above, or add one after a battle.</div>';
+            return;
+        }
+        el.innerHTML = '';
+        friends.forEach((f) => {
+            const row = document.createElement('div');
+            row.className = 'nearby-row';
+            row.style.cursor = 'pointer';
+            row.innerHTML = `
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="online-dot" data-dot-for="${f.friendUid}" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#d4d4d8;"></span>
+                    <span class="nearby-name">${f.friendName}</span>
+                </div>`;
+            row.onclick = () => openProfileView(f.friendUid, f.friendName);
+            el.appendChild(row);
+            Presence.isRecentlyOnline(f.friendUid).then((online) => {
+                const dot = row.querySelector(`[data-dot-for="${f.friendUid}"]`);
+                if (dot && online) dot.style.background = '#10b981';
+            });
+        });
+    }
+
+    // ── SEARCH ────────────────────────────────────────────
+    async function doSearch() {
+        const term = document.getElementById('searchInput').value.trim();
+        const resultsEl = document.getElementById('searchResults');
+        if (!term) { resultsEl.innerHTML = ''; return; }
+        resultsEl.innerHTML = '<div class="empty-note">Searching...</div>';
+        try {
+            const results = await searchUsersByUsername(term);
+            const auth_uid = auth.currentUser ? auth.currentUser.uid : null;
+            const filtered = results.filter(r => r.uid !== auth_uid);
+            if (filtered.length === 0) { resultsEl.innerHTML = '<div class="empty-note">No matching players.</div>'; return; }
+            resultsEl.innerHTML = '';
+            filtered.forEach((u) => {
+                const row = document.createElement('div');
+                row.className = 'nearby-row';
+                row.style.cursor = 'pointer';
+                row.innerHTML = `<span class="nearby-name">${u.username}</span>`;
+                row.onclick = () => openProfileView(u.uid, u.username);
+                resultsEl.appendChild(row);
+            });
+        } catch (err) {
+            resultsEl.innerHTML = `<div class="empty-note status-error">${err.message}</div>`;
+        }
+    }
+    document.getElementById('searchBtn').onclick = doSearch;
+    document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+    // ── PROFILE VIEW (tap a name -> here, back -> list) ──
+    let pvCurrentUid = null, pvCurrentName = null;
+
+    async function openProfileView(uid, name) {
+        pvCurrentUid = uid; pvCurrentName = name;
+        document.getElementById('listsSegment').classList.add('hidden');
+        document.getElementById('profileViewSegment').classList.remove('hidden');
+
+        document.getElementById('pvName').textContent = name;
+        document.getElementById('pvTitle').textContent = 'Loading...';
+        document.getElementById('pvOnlineDot').style.background = '#d4d4d8';
+        document.getElementById('pvOnlineText').textContent = 'Checking...';
+        document.getElementById('pvFriendBtn').textContent = myFriendUids.has(uid) ? 'Remove Friend' : 'Add Friend';
+
+        try {
+            const snap = await getDoc(doc(db, 'users', uid));
+            const data = snap.exists() ? snap.data() : {};
+            document.getElementById('pvTitle').textContent = getCombatTitle(
+                data.infantryUsage || 0, data.archerUsage || 0, data.horsemanUsage || 0, data.spearUsage || 0
+            );
+            document.getElementById('pvWins').textContent = data.wins || 0;
+            document.getElementById('pvLosses').textContent = data.losses || 0;
+            document.getElementById('pvScore').textContent = data.totalDamageDealt || 0;
+        } catch (e) {
+            document.getElementById('pvTitle').textContent = 'Unknown';
+        }
+
+        const online = await Presence.isRecentlyOnline(uid);
+        document.getElementById('pvOnlineDot').style.background = online ? '#10b981' : '#d4d4d8';
+        document.getElementById('pvOnlineText').textContent = online ? 'Online' : 'Offline';
+    }
+
+    document.getElementById('profileBackBtn').onclick = () => {
+        document.getElementById('profileViewSegment').classList.add('hidden');
+        document.getElementById('listsSegment').classList.remove('hidden');
+    };
+
+    document.getElementById('pvChallengeBtn').onclick = async () => {
+        const btn = document.getElementById('pvChallengeBtn');
+        btn.disabled = true; btn.textContent = 'Sending...';
+        try {
+            const { matchId } = await MatchSync.createChallenge(pvCurrentUid, pvCurrentName, username, rollWeather(), rollWind());
+            window.location.href = `battle.html?mode=pvp&match=${encodeURIComponent(matchId)}&role=host`;
+        } catch (err) {
+            alert(err.message || 'Could not send challenge.');
+            btn.disabled = false; btn.textContent = 'Challenge';
+        }
+    };
+
+    document.getElementById('pvFriendBtn').onclick = async () => {
+        const btn = document.getElementById('pvFriendBtn');
+        const user = auth.currentUser;
+        if (!user) return;
+        btn.disabled = true;
+        try {
+            if (myFriendUids.has(pvCurrentUid)) {
+                await removeFriend(user, pvCurrentUid);
+                btn.textContent = 'Add Friend';
+            } else {
+                await addFriend(user, pvCurrentUid, pvCurrentName);
+                btn.textContent = 'Remove Friend';
+            }
+        } catch (err) {
+            alert(err.message || 'Could not update friend list.');
+        }
+        btn.disabled = false;
+    };
+</script>
+
+</body>
+</html>

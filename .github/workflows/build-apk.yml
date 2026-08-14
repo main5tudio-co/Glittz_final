@@ -1,0 +1,49 @@
+name: Build Android APK
+
+# Runs on GitHub's servers — NOT on your phone. Termux never touches
+# the Android SDK/Gradle; it just pushes code here and this builds it.
+#
+# Trigger manually from the GitHub app/site (Actions tab > this
+# workflow > "Run workflow"), or automatically on every push to main
+# if you uncomment the `push:` block below.
+on:
+  workflow_dispatch: {}
+  # push:
+  #   branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java (Gradle needs this)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Sync web assets into the Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: ./android
+        run: chmod +x ./gradlew && ./gradlew assembleDebug
+
+      - name: Upload APK as a downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glittz-of-horizon-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
