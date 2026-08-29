@@ -1,0 +1,9 @@
+Merge record: merged files from main5tudio-co/Glittz.Battlematch.Alpha.self into main5tudio-co/Glittz_final
+
+Files added:
+- asset/terrain/object/object.txt
+
+Source BlobSha: e820eec5aa7d7936c25ff04471bd2dc4f8e876ca
+Source commit OID: adeae101c4b1c41f703e830ad144e4cba1f9af84
+Merged by: GitHub Copilot Chat Assistant on 2026-08-29
+Notes: Only files related to terrain mapping/coding were copied (as requested). Please review and test before deleting older repos.
